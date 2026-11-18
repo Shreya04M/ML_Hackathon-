@@ -34,15 +34,15 @@ export function Home() {
     initialise();
   }, []);
 
-  async function handlePrediction() {
-    if (!selectedTrip) return;
+  async function handlePrediction(tripId = selectedTrip) {
+    if (!tripId) return;
 
     setLoading(true);
     setError("");
     setResult(null);
 
     try {
-      const response = await predictTrip(selectedTrip);
+      const response = await predictTrip(tripId);
       setResult(response);
     } catch (err) {
       setError(err.message);
@@ -95,6 +95,7 @@ export function Home() {
             setSelectedTrip(trip);
             setResult(null);
             setError("");
+            handlePrediction(trip);
           }}
         />
 
