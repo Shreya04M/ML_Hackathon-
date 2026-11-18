@@ -1,0 +1,84 @@
+{
+  "strategy": "Gaussian Process Surrogate (Matern nu=2.5) + Expected Improvement (Strict Bayesian Optimisation, zero Grid/Random search)",
+  "n_trials": 12,
+  "best_trial": 6,
+  "best_params": {
+    "loss": "log_loss",
+    "learning_rate": 0.16973,
+    "max_leaf_nodes": 120,
+    "max_depth": 15,
+    "min_samples_leaf": 33,
+    "l2_regularization": 0.389,
+    "max_iter": 250,
+    "class_weight": "balanced",
+    "early_stopping": true,
+    "validation_fraction": 0.1,
+    "n_iter_no_change": 15,
+    "scoring": "loss",
+    "random_state": 42
+  },
+  "total_optimisation_wall_time_s": 130.85,
+  "tuned_cv_summary": {
+    "f1_macro_mean": 0.865890183140553,
+    "f1_macro_std": 0.04746278662427456,
+    "log_loss_mean": 0.19357227075228134,
+    "top1_accuracy_mean": 0.7630567116232793
+  },
+  "tuned_student_test": {
+    "n_candidates": 114960,
+    "positive_rate": 0.16671016005567155,
+    "accuracy": 0.9390831593597773,
+    "precision_macro": 0.871225702659894,
+    "recall_macro": 0.9388634270391649,
+    "f1_macro": 0.8997958802575674,
+    "precision_pos": 0.7553754409541408,
+    "recall_pos": 0.9385337855465693,
+    "f1_pos": 0.8370523768527351,
+    "log_loss": 0.1583415354489997,
+    "confusion_matrix": {
+      "tn": 89970,
+      "fp": 5825,
+      "fn": 1178,
+      "tp": 17987
+    },
+    "train_time_s": 12.252283000008902,
+    "inference_time_s": 0.27264239999931306,
+    "top1_accuracy": 0.8776617954070981,
+    "candidate_miss_rate": 0.006837160751565707,
+    "top1_accuracy_given_hit": 0.8837038204845237,
+    "route_continuity": 0.9209399477806789,
+    "sequence_f1_mean": 0.8799080645459083,
+    "per_trip_top1_mean": 0.8851375610288699,
+    "per_trip_top1_std": 0.05026809174858431,
+    "n_observations": 19160,
+    "n_trips": 10,
+    "inference_ms_per_trip": 27.264239999931306,
+    "inference_ms_per_1k_obs": 14.229770354870201
+  },
+  "comparison": [
+    {
+      "Variant": "Untuned HistGradientBoosting (Baseline)",
+      "CV Macro F1-score": 0.8608,
+      "CV Macro F1 Std": 0.0492,
+      "Student-Test Top-1 Accuracy": 0.879,
+      "Student-Test Macro F1-score": 0.8928,
+      "Log Loss": 0.1672,
+      "Route Continuity": 0.9212,
+      "Sequence F1": 0.8771,
+      "Inference Time (s)": 0.3112,
+      "Train Time (s)": 12.36
+    },
+    {
+      "Variant": "Bayesian-Tuned HistGradientBoosting (GP-EI)",
+      "CV Macro F1-score": 0.8659,
+      "CV Macro F1 Std": 0.0475,
+      "Student-Test Top-1 Accuracy": 0.8777,
+      "Student-Test Macro F1-score": 0.8998,
+      "Log Loss": 0.1583,
+      "Route Continuity": 0.9209,
+      "Sequence F1": 0.8799,
+      "Inference Time (s)": 0.2726,
+      "Train Time (s)": 12.25
+    }
+  ]
+}
