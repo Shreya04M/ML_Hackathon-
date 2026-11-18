@@ -2,15 +2,26 @@
 """Service-layer integration for PathSnap."""
 
 import os
+from functools import lru_cache
 from pathlib import Path
+from time import perf_counter
+
 import folium
+import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PREDICTION_ARTIFACT = (
+    PROJECT_ROOT
+    / "models"
+    / "artifacts"
+    / "results"
+    / "m3_handoff_student_test_probabilities.csv.gz"
+)
 
 DATA_DIR = Path(
     os.environ.get(
         "PATHSNAP_TRIP_DIR",
-        str(PROJECT_ROOT / "data" / "Student folder" / "student_test")
+        str(PROJECT_ROOT / "Student folder" / "student_test")
     )
 )
 
@@ -42,15 +53,71 @@ def list_available_trips() -> list[str]:
     return sorted(trip_ids)
 
 
+@lru_cache(maxsize=1)
+def _load_prediction_candidates() -> pd.DataFrame:
+    """Load the precomputed student-test candidate probabilities once."""
+
+    if not PREDICTION_ARTIFACT.is_file():
+        raise FileNotFoundError(
+            f"Prediction artifact not available: {PREDICTION_ARTIFACT}"
+        )
+
+    return pd.read_csv(PREDICTION_ARTIFACT)
+
+
 def predict_trip(trip_id: str) -> dict:
     """Run prediction for an approved trip."""
 
     if trip_id not in list_available_trips():
         raise ValueError("Invalid trip ID")
 
-    raise NotImplementedError(
-        "Model and HMM integration pending"
+    from evaluation.route_evaluation import evaluate_route
+    from route_reconstruction.hmm import reconstruct_route
+
+    started_at = perf_counter()
+    trip_candidates = _load_prediction_candidates()
+    trip_candidates = trip_candidates[
+        trip_candidates["trip_id"].astype(str).str.zfill(8) == trip_id
+    ].copy()
+
+    if trip_candidates.empty:
+        raise ValueError("Prediction candidates not found for trip")
+
+    reconstructed = reconstruct_route(candidates=trip_candidates)
+    predicted_route = (
+        reconstructed.sort_values("obs_id")["hmm_arc_id"]
+        .astype(int)
+        .tolist()
     )
+
+    reference_file = DATA_DIR / trip_id / f"{trip_id}.route"
+    if not reference_file.is_file():
+        raise FileNotFoundError(f"Reference route not available: {reference_file}")
+
+    with reference_file.open("r", encoding="utf-8") as file:
+        reference_route = [
+            int(line.strip())
+            for line in file
+            if line.strip()
+        ]
+
+    metrics = evaluate_route(predicted_route, reference_route)
+    metrics["accuracy"] = float(
+        (
+            reconstructed["hmm_arc_id"]
+            == reconstructed["ref_arc_id"]
+        ).mean()
+    )
+    map_html = generate_trip_map(trip_id, predicted_route)
+
+    return {
+        "trip_id": trip_id,
+        "status": "completed",
+        "predicted_route": predicted_route,
+        "metrics": metrics,
+        "execution_time": perf_counter() - started_at,
+        "map_html": map_html,
+    }
 
 def generate_trip_map(
     trip_id: str,

@@ -34,3 +34,5 @@ PathSnap_student_materials/
 Student folder/
 CONTRIBUTORS.md
 .package-lock.json
+.env.example
+.env.example

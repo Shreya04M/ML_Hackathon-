@@ -33,7 +33,7 @@ python -m pip install -r requirements.txt
 For Windows PowerShell:
 
 ```powershell
-$env:PATHSNAP_TRIP_DIR="./data/Student folder/student_test"
+$env:PATHSNAP_TRIP_DIR="./Student folder/student_test"
 ```
 
 Use the actual approved dataset directory on the server laptop.
