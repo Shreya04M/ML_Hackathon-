@@ -30,3 +30,6 @@ data/raw/*
 data/processed/*
 
 node_modules/
+PathSnap_student_materials/
+Student folder/
+CONTRIBUTORS.md
