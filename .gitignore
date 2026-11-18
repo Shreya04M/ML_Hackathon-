@@ -15,11 +15,21 @@ logs/
 node_modules/
 frontend/.vite/
 # Do not blanket-ignore data/ or artifacts/; use Git LFS/approved storage for large files.
+
+# Local duplicate dataset
+/data/Student folder/
+
+# Synthetic experiment results
+/experiments/results/
+# Generated frontend build
+/frontend/dist/
 .env
 *.pyc
 
 data/raw/*
 data/processed/*
+
+node_modules/
 PathSnap_student_materials/
 Student folder/
 CONTRIBUTORS.md
