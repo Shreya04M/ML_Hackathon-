@@ -351,7 +351,13 @@ def compare_models(results: list[dict[str, Any]] | dict[str, dict[str, Any]]) ->
 
 
 def select_best_model(results: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """Select the optimal model using multi-criteria generalisation, calibration, and speed."""
+    """Select the optimal model using all six Section 6 criteria from the guidelines.
+
+    Balances (1) map-matching generalisation (Student-Test Top-1 Accuracy, Sequence F1,
+    Macro F1, CV Macro F1), (2) probability calibration (Log Loss for HMM emissions),
+    (3) route continuity, (4) CV fold stability, (5) fast API inference latency, and
+    (6) model complexity & Bayesian tuning cost (fit speed).
+    """
     best_key: str | None = None
     best_score = -1e9
     scored_candidates: list[dict[str, Any]] = []
@@ -364,29 +370,35 @@ def select_best_model(results: dict[str, dict[str, Any]]) -> dict[str, Any]:
     inf_times = [r["student_test"]["inference_time_s"] for r in results.values()]
     max_inf = max(inf_times) if inf_times else 1.0
 
+    train_times = [r["train_fit"]["train_time_s"] or 0.0 for r in results.values()]
+    max_tr = max(train_times) if train_times else 1.0
+
     for key, entry in results.items():
         cv_f1 = entry["cv"]["f1_macro_mean"]
         cv_std = entry["cv"]["f1_macro_std"]
         st_f1 = entry["student_test"]["f1_macro"]
         st_top1 = entry["student_test"]["top1_accuracy"] or 0.0
+        st_seq = entry["student_test"].get("sequence_f1_mean") or st_f1
         st_cont = entry["student_test"]["route_continuity"] or 0.0
         st_ll = entry["student_test"]["log_loss"]
         st_inf = entry["student_test"]["inference_time_s"]
+        tr_time = entry["train_fit"]["train_time_s"] or 0.0
 
         norm_ll_quality = 1.0 - (st_ll - min_ll) / ll_span
-        norm_speed = 1.0 - min(st_inf / max(max_inf, 1e-6), 1.0)
+        norm_inf_speed = 1.0 - min(st_inf / max(max_inf, 1e-6), 1.0)
+        norm_fit_efficiency = 1.0 - min(tr_time / max(max_tr, 1e-6), 1.0)
         stability = max(0.0, 1.0 - 10.0 * cv_std)
 
-        # Primary weights prioritize generalisation (Macro F1 + Top-1), probability calibration
-        # (Log Loss for HMM emission scoring), continuity, stability, and fast inference.
         composite = (
-            0.30 * st_f1
-            + 0.25 * cv_f1
-            + 0.20 * st_top1
-            + 0.15 * norm_ll_quality
+            0.25 * st_top1
+            + 0.20 * st_seq
+            + 0.18 * st_f1
+            + 0.14 * cv_f1
+            + 0.10 * norm_ll_quality
             + 0.05 * st_cont
-            + 0.03 * stability
-            + 0.02 * norm_speed
+            + 0.05 * norm_fit_efficiency
+            + 0.02 * norm_inf_speed
+            + 0.01 * stability
         )
         scored_candidates.append({"key": key, "name": entry["name"], "composite_score": round(composite, 5)})
         if composite > best_score:

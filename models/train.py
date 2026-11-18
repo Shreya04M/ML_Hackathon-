@@ -231,19 +231,13 @@ def _format_markdown_comparison_table(df: pd.DataFrame) -> str:
 
 def _select_trip_stratified_train_diag_slice(
     meta_train: pd.DataFrame,
-    max_rows: int = 120_000,
+    max_rows: int = 125_000,
 ) -> np.ndarray:
-    """Select complete trips deterministically (~120k rows) for fast train-fit overfitting diagnostics."""
-    if len(meta_train) <= max_rows or "trip_id" not in meta_train.columns:
+    """Select every N-th complete observation across all 80 trips for unbiased train diagnostics."""
+    if len(meta_train) <= max_rows or "obs_id" not in meta_train.columns:
         return np.arange(len(meta_train), dtype=np.int64)
-    chosen_trips: list[str] = []
-    acc = 0
-    for trip_id, cnt in meta_train.groupby("trip_id", sort=True).size().items():
-        if acc + int(cnt) > max_rows and chosen_trips:
-            break
-        chosen_trips.append(str(trip_id))
-        acc += int(cnt)
-    mask = meta_train["trip_id"].isin(chosen_trips).to_numpy()
+    stride = max(1, int(np.ceil(len(meta_train) / max_rows)))
+    mask = (meta_train["obs_id"].to_numpy(dtype=np.int64) % stride) == 0
     return np.flatnonzero(mask)
 
 
