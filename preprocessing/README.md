@@ -74,10 +74,10 @@ The pipeline inserts `trip_id` as the first column. The feature extractor does n
 
 | Column | Values | Meaning |
 |---|---|---|
-| `label` | `1` or nullable `Int64` | `1` when `candidate_arc_id` occurs in the reference route; nullable when unresolved |
-| `label_status` | `validated_positive` or `unresolved` | Whether the candidate received a validated positive label |
+| `label` | `0`, `1`, or nullable `Int64` | `1` when `candidate_arc_id` occurs in the reference route, otherwise `0`; nullable when unresolved |
+| `label_status` | `validated_positive`, `validated_negative`, or `unresolved` | Validation result for the candidate |
 
-This implementation is conservative: it does **not** assign `0` to non-route candidates. It reports `negative_labels: 0` and leaves non-members unresolved. If a trip has no route, all labels are unresolved.
+For trips with a reference route, non-route candidates receive validated `0` labels, making the output suitable for binary classifier training. If a trip has no route, all labels remain unresolved.
 
 ## Output files
 
