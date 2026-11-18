@@ -1,6 +1,6 @@
 """
 PathSnap - Experiment Tracker
-Member 3 - Bayesian Hyperparameter Optimisation
+Bayesian Hyperparameter Optimisation
 """
 
 import json

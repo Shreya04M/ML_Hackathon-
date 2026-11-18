@@ -12,9 +12,7 @@ import pandas as pd
 
 
 ROOT = Path(".")
-OUTPUT_DIR = Path(
-    "route_reconstruction/experiments/phase2_improved"
-)
+OUTPUT_DIR = Path("experiments/results")
 
 
 def _read_json(path):
@@ -24,7 +22,14 @@ def _read_json(path):
 
 def main(output_dir=OUTPUT_DIR):
     output_dir = Path(output_dir)
-    metrics = _read_json(output_dir / "overall_metrics.json")
+    graphs_dir = output_dir / "graphs"
+    graphs_dir.mkdir(parents=True, exist_ok=True)
+    metrics_path = (
+        output_dir / "phase2_overall_metrics.json"
+        if (output_dir / "phase2_overall_metrics.json").is_file()
+        else output_dir / "overall_metrics.json"
+    )
+    metrics = _read_json(metrics_path)
     previous_hmm = _read_json(
         ROOT / "experiments/results/optimised_reconstruction/overall_metrics.json"
     )
@@ -75,7 +80,7 @@ def main(output_dir=OUTPUT_DIR):
     axis.set_title("Observation-level prediction quality")
     axis.legend()
     fig.tight_layout()
-    fig.savefig(output_dir / "observation_metrics.png", dpi=160)
+    fig.savefig(graphs_dir / "observation_metrics.png", dpi=160)
     plt.close(fig)
 
     recovery_labels = [
@@ -120,7 +125,7 @@ def main(output_dir=OUTPUT_DIR):
     axes[3].grid(axis="y", alpha=0.25)
     fig.suptitle("Intermediate road recovery outcomes (10 trips)")
     fig.tight_layout()
-    fig.savefig(output_dir / "recovery_comparison.png", dpi=160)
+    fig.savefig(graphs_dir / "recovery_comparison.png", dpi=160)
     plt.close(fig)
 
     route_quality = metrics["route_quality_macro_average"]
@@ -165,7 +170,7 @@ def main(output_dir=OUTPUT_DIR):
     axis.set_title("Recovered route correctness against .route references")
     axis.legend()
     fig.tight_layout()
-    fig.savefig(output_dir / "route_quality.png", dpi=160)
+    fig.savefig(graphs_dir / "route_quality.png", dpi=160)
     plt.close(fig)
 
     old_runtime = previous_hmm["runtime_seconds"]
@@ -188,14 +193,14 @@ def main(output_dir=OUTPUT_DIR):
     axis.tick_params(axis="x", labelrotation=15)
     axis.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(output_dir / "runtime_comparison.png", dpi=160)
+    fig.savefig(graphs_dir / "runtime_comparison.png", dpi=160)
     plt.close(fig)
 
     pd.DataFrame({
         "metric": runtime_labels,
         "runtime_seconds": runtime_values,
-    }).to_csv(output_dir / "runtime_comparison.csv", index=False)
-    print(f"Saved four comparison graphs to {output_dir}")
+    }).to_csv(output_dir / "phase2_runtime_comparison.csv", index=False)
+    print(f"Saved four comparison graphs to {graphs_dir}")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
 """Canonical, leakage-free spatial candidate generation and 20-feature pipeline.
 
-Owned by Member 1 (``preprocessing/``) and consumed by Member 2 (``models/``) and
-Member 3 (``route_reconstruction/``). Projects raw WGS84 coordinates into local
-tangent-plane meters, generates K=6 spatial candidates via adaptive ``cKDTree``
-arc sampling, computes 20 geometric/kinematic/topological features without label
-leakage, and associates reference route labels strictly for train/student_test.
+Projects raw WGS84 coordinates into local tangent-plane meters, generates
+K=6 spatial candidates via adaptive ``cKDTree`` arc sampling, computes 20
+geometric, kinematic, and topological features without label leakage, and
+associates reference route labels strictly for training and validation.
 """
 from __future__ import annotations
 
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 EARTH_RADIUS_M = 6_371_000.0
 DEFAULT_RAW_ROOT = Path("Student folder")
-DEFAULT_CACHE_DIR = Path("models") / "artifacts" / "cache"
+DEFAULT_CACHE_DIR = Path("data") / "processed"
 
 FEATURE_COLUMNS: list[str] = [
     "ortho_dist_m",

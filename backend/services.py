@@ -60,22 +60,8 @@ def _resolve_data_dir() -> Path:
 
 DATA_DIR = _resolve_data_dir()
 
-MODEL_PATH = (
-    PROJECT_ROOT / "artifacts" / "models" / "selected_best_model_tuned.joblib"
-    if (PROJECT_ROOT / "artifacts" / "models" / "selected_best_model_tuned.joblib").is_file()
-    else PROJECT_ROOT / "models" / "artifacts" / "models" / "selected_best_model_tuned.joblib"
-)
-
-HMM_PARAM_PATH = (
-    PROJECT_ROOT / "artifacts" / "hmm" / "best_hmm_parameters.json"
-    if (PROJECT_ROOT / "artifacts" / "hmm" / "best_hmm_parameters.json").is_file()
-    else PROJECT_ROOT
-    / "route_reconstruction"
-    / "experiments"
-    / "phase2_improved"
-    / "hmm_optimisation"
-    / "best_hmm_parameters.json"
-)
+MODEL_PATH = PROJECT_ROOT / "artifacts" / "models" / "selected_best_model_tuned.joblib"
+HMM_PARAM_PATH = PROJECT_ROOT / "artifacts" / "hmm" / "best_hmm_parameters.json"
 
 
 def _discover_trips(data_dir: Path) -> list[str]:

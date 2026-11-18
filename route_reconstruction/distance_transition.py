@@ -1,6 +1,6 @@
 """
 PathSnap - Distance-Based Transition Scoring
-Member 3 - Phase 2
+Route Reconstruction
 """
 
 from pathlib import Path

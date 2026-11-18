@@ -423,9 +423,8 @@ def create_bayesian_cv_objective(
 ) -> Callable[[dict[str, Any]], float]:
     """Create a GroupKFold CV objective strictly for Bayesian hyperparameter optimisation.
 
-    Designed exclusively for Bayesian surrogate optimisers (e.g., Optuna TPE or
-    scikit-optimize GP-Minimize) in Member 3's tuning pipeline. Member 2 performs zero
-    grid search or random search during model experimentation and selection.
+    Designed exclusively for Bayesian surrogate optimisers (e.g., GP-EI or Optuna
+    TPE) in the PathSnap tuning pipeline without grid or random search.
     """
     y_arr = np.asarray(y, dtype=np.int64)
     groups_arr = np.asarray(groups)

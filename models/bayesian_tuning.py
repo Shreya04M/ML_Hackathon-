@@ -1,7 +1,7 @@
 """Gaussian-Process Bayesian Hyperparameter Optimisation for the selected model.
 
 Provides a strictly Bayesian (GP-Matern surrogate + Expected Improvement acquisition)
-optimisation script over the Member 2 selected HistGradientBoosting model using
+optimisation script over the selected HistGradientBoosting model using
 trip-grouped GroupKFold cross-validation on the 80 training trips only (zero grid
 search or random search, zero evaluator-test leakage).
 """
@@ -89,13 +89,17 @@ def run_bayesian_optimisation(
     n_init: int = 3,
     n_bayes_iters: int = 9,
     n_splits: int = 5,
-    artifacts_dir: Path | str = Path("models") / "artifacts",
+    artifacts_dir: Path | str | None = None,
 ) -> dict[str, Any]:
     """Run GP-EI Bayesian optimisation over 80 training trips and compare Tuned vs Untuned."""
     t_total0 = time.perf_counter()
-    art_root = Path(artifacts_dir)
-    results_dir = art_root / "results"
-    models_dir = art_root / "models"
+    if artifacts_dir is None:
+        models_dir = Path("artifacts") / "models"
+        results_dir = Path("experiments") / "results"
+    else:
+        art_root = Path(artifacts_dir)
+        models_dir = art_root / "models"
+        results_dir = art_root / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
     models_dir.mkdir(parents=True, exist_ok=True)
 

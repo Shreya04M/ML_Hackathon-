@@ -1,4 +1,4 @@
-"""Reproducible Member 1 preprocessing pipeline; never trains models."""
+"""Reproducible PathSnap preprocessing pipeline; never trains models."""
 from pathlib import Path
 import argparse
 import pandas as pd

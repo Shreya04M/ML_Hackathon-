@@ -1,4 +1,4 @@
-"""Public Member 2 ML model experimentation, selection, and serving interfaces."""
+"""Public PathSnap ML model experimentation, selection, and serving interfaces."""
 from __future__ import annotations
 
 from typing import Any

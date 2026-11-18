@@ -1,6 +1,6 @@
 """
 PathSnap - Bayesian Hyperparameter Optimisation
-Member 3 - Model Optimisation
+Model Optimisation
 """
 
 import numpy as np

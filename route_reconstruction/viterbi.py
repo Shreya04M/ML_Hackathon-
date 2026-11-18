@@ -1,6 +1,6 @@
 """
 PathSnap - Viterbi Decoding Algorithm
-Member 3 - Route Reconstruction
+Route Reconstruction
 """
 
 import numpy as np

@@ -1,5 +1,5 @@
 """
-PathSnap - Member 3
+PathSnap - Bayesian Optimisation Compatibility Tests
 Compatibility testing for all five ML models.
 """
 

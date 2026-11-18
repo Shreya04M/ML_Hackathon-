@@ -1,132 +1,23 @@
-# Preprocessing integration handoff
+# Data Loading & Spatial Preprocessing
 
-This package converts raw PathSnap trip files into candidate-level feature and label tables. It does not train a model or perform route reconstruction.
+Leakage-free raw data ingestion, cleaning diagnostics, local tangent-plane metric projection, adaptive `cKDTree` candidate generation, and 20-feature extraction.
 
-## Input layout
+## Modules
 
-`PATHSNAP_DATA_ROOT` must point to a dataset directory containing optional `train/` and `student_test/` partitions. Each trip is an immediate child directory:
+| File | Role |
+| :--- | :--- |
+| [spatial_pipeline.py](spatial_pipeline.py) | **Canonical production pipeline** (`extract_trip_candidates_and_features`, `build_partition_dataset`): local-meter projection, `K=6` adaptive `cKDTree` candidates (`99.32%` `student_test` coverage), 20 leakage-free features (`FEATURE_COLUMNS`), and `route=None` isolation for inference |
+| [data_loader.py](data_loader.py) | Raw `.track`, `.nodes`, `.arcs`, and `.route` parser preserving zero-based indices and trip IDs |
+| [data_cleaning.py](data_cleaning.py) | GPS step velocity, duplicate observation, gap flagging, and road network geometry checks |
+| [road_network.py](road_network.py) | Directed arc table with segment lengths and bearings |
+| [candidate_generation.py](candidate_generation.py) | Radius-based equirectangular `cKDTree` candidate generator |
+| [feature_engineering.py](feature_engineering.py) | Kinematic and arc-geometry feature computation (`route`-free) |
+| [label_generation.py](label_generation.py) | Candidate reference-route label assignment for offline evaluation |
+| [data_exploration.py](data_exploration.py) | Read-only partition inventory and anomaly auditing |
+| [run_pipeline.py](run_pipeline.py) | Standalone CLI preprocessing runner writing CSV tables to `data/processed/` |
 
-```text
-<dataset-root>/<partition>/<trip-id>/
-    <trip-id>.track
-    <trip-id>.nodes
-    <trip-id>.arcs
-    <trip-id>.route       # normally available for train trips
-```
-
-The loader preserves the trip directory name as `trip_id`. Files are whitespace separated and have no header.
-
-## Parsed schemas
-
-| File | Columns | Meaning |
-|---|---|---|
-| `.track` | `longitude`, `latitude`, `timestamp` | Ordered GPS observations |
-| `.nodes` | `node_id`, `longitude`, `latitude` | Node coordinates; `node_id` is the zero-based row index |
-| `.arcs` | `arc_id`, `from_node_id`, `to_node_id` | Directed road arcs; `arc_id` is the zero-based row index |
-| `.route` | `route_position`, `arc_id` | Reference route sequence; `route_position` is the zero-based row index |
-
-`observation_id` is added as the zero-based row index of each track. Cleaning also derives `time_diff_s`, `movement_distance_m`, `speed_mps`, duplicate flags, validity flags, and `clean`.
-
-## Candidate identifiers and schema
-
-Candidates are generated per observation using a local equirectangular projection and a `cKDTree` over road-segment midpoints. The default perpendicular-distance radius is 50 metres (`radius_m`).
-
-Each candidate row contains:
-
-| Column | Meaning |
-|---|---|
-| `observation_id` | GPS observation owning the candidate |
-| `timestamp` | Observation timestamp |
-| `gps_longitude`, `gps_latitude` | Original GPS position |
-| `candidate_arc_id` | Road arc being considered; primary candidate identifier |
-| `candidate_distance_m` | Distance from GPS point to projected arc point |
-| `nearest_longitude`, `nearest_latitude` | Projected point on the candidate arc |
-| `projection_fraction` | Clamped position on the arc, from 0 to 1 |
-
-The road-network table uses `arc_id` for the same road identity. Candidate records should be identified by `(trip_id, observation_id, candidate_arc_id)`; a candidate arc can recur at multiple observations.
-
-## Feature schema
-
-`extract_features(observations, candidates, road_network)` returns the candidate columns plus:
-
-```text
-time_diff_s
-movement_distance_m
-speed_mps
-movement_bearing_deg
-arc_id
-length_m
-bearing_deg
-start_lon
-start_lat
-end_lon
-end_lat
-bearing_difference_deg
-distance_to_start_m
-distance_to_end_m
-```
-
-The pipeline inserts `trip_id` as the first column. The feature extractor does not use reference-route membership or evaluator labels.
-
-## Label schema and semantics
-
-`generate_labels(candidates, route)` appends:
-
-| Column | Values | Meaning |
-|---|---|---|
-| `label` | `0`, `1`, or nullable `Int64` | `1` when `candidate_arc_id` occurs in the reference route, otherwise `0`; nullable when unresolved |
-| `label_status` | `validated_positive`, `validated_negative`, or `unresolved` | Validation result for the candidate |
-
-For trips with a reference route, non-route candidates receive validated `0` labels, making the output suitable for binary classifier training. If a trip has no route, all labels remain unresolved.
-
-## Output files
-
-The pipeline writes:
-
-```text
-data/processed/train_features.csv
-data/processed/train_candidate_labels.csv
-data/processed/student_test_features.csv
-data/processed/student_test_candidate_labels.csv
-```
-
-It also returns cleaning, candidate-coverage, and label summary records. The current runner creates the output and results directories but does not write those returned summaries to a separate report file.
-
-## Entry point
-
-Configure `.env` at the repository root:
-
-```text
-PATHSNAP_DATA_ROOT=<dataset-root>
-```
-
-Run from the repository root:
+## Production Verification
 
 ```powershell
-python -m preprocessing.run_pipeline
+python -m pytest -v tests/test_data_loader.py tests/test_preprocessing.py
 ```
-
-Useful overrides:
-
-```powershell
-python -m preprocessing.run_pipeline `
-  --dataset-root <dataset-root> `
-  --output-dir data/processed `
-  --results-dir experiments/results `
-  --radius-m 50
-```
-
-Programmatic entry point:
-
-```python
-from preprocessing.run_pipeline import run
-
-summary = run(
-    dataset_root="<dataset-root>",
-    output_dir="data/processed",
-    results_dir="experiments/results",
-    radius_m=50.0,
-)
-```
-
-The runner processes `train` and `student_test` independently, skips trips without a track, and records zero candidate coverage for trips missing either `.nodes` or `.arcs`.

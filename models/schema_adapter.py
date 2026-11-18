@@ -1,10 +1,10 @@
-"""Schema adapter bridging Member 1's ``preprocessing/`` pipeline with Member 2's ``models/``.
+"""Schema adapter bridging the ``preprocessing/`` pipeline with ``models/``.
 
 All spatial candidate generation, metric coordinate projection, and 20-feature
-extraction live cleanly in ``preprocessing.spatial_pipeline`` (Member 1 ownership)
-to eliminate duplication. This module re-exports the canonical pipeline symbols for
-backward compatibility and provides ``load_feature_dataset()`` to normalize external
-CSV/Parquet/Joblib feature tables into Member 2's ``(X_df, y, meta_df)`` contract.
+extraction live cleanly in ``preprocessing.spatial_pipeline`` to eliminate
+duplication. This module re-exports the canonical pipeline symbols for
+compatibility and provides ``load_feature_dataset()`` to normalize external
+CSV/Parquet/Joblib feature tables into the ``(X_df, y, meta_df)`` contract.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def load_feature_dataset(
     source: pd.DataFrame | Path | str,
     feature_cols: list[str] | None = None,
 ) -> tuple[pd.DataFrame, np.ndarray, pd.DataFrame]:
-    """Normalize an external Member 1 feature dataset (CSV, Parquet, Joblib, or DataFrame)."""
+    """Normalize an external feature dataset (CSV, Parquet, Joblib, or DataFrame)."""
     if isinstance(source, pd.DataFrame):
         df = source.copy()
     else:

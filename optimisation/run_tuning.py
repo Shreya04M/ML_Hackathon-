@@ -1,6 +1,6 @@
 """
-PathSnap - Actual Model Tuning
-Member 3 - Bayesian Hyperparameter Optimisation
+PathSnap - Model Tuning
+Bayesian Hyperparameter Optimisation
 """
 
 import argparse

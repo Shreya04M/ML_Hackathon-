@@ -1,6 +1,6 @@
 """
 PathSnap - Bayesian HMM Optimisation
-Member 3 - Phase 2
+Distance-Based Transition Tuning
 """
 
 import argparse
@@ -12,15 +12,9 @@ import numpy as np
 import optuna
 
 
-CACHE_DIR = Path(
-    "route_reconstruction/experiments/phase2_improved/"
-    "hmm_validation/cache"
-)
+CACHE_DIR = Path("data/processed/hmm_validation_cache")
 
-OUTPUT_DIR = Path(
-    "route_reconstruction/experiments/phase2_improved/"
-    "hmm_optimisation"
-)
+OUTPUT_DIR = Path("artifacts/hmm")
 
 N_TRIALS = 25
 

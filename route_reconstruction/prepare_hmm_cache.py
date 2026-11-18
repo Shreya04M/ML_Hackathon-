@@ -1,6 +1,6 @@
 """
 PathSnap - HMM Validation Cache
-Member 3 - Phase 2
+Precomputed Training Graph Distances
 """
 
 import argparse
@@ -32,10 +32,7 @@ INPUT_PATH = Path(
     "training_oof_probabilities.csv.gz"
 )
 
-CACHE_DIR = Path(
-    "route_reconstruction/experiments/phase2_improved/"
-    "hmm_validation/cache"
-)
+CACHE_DIR = Path("data/processed/hmm_validation_cache")
 
 TOP_K = 6
 BACKWARD_TOLERANCE_M = 30.0

@@ -1,6 +1,6 @@
 """
 PathSnap - Hyperparameter Search Spaces
-Member 3 - Bayesian Hyperparameter Optimisation
+Bayesian Hyperparameter Optimisation
 """
 
 SUPPORTED_MODELS = (

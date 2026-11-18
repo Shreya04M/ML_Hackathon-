@@ -1,11 +1,11 @@
-"""End-to-end training orchestrator, live progress tracker, and Member 3/4 handoffs.
+"""End-to-end model training orchestrator, live progress tracker, and artifact exporter.
 
 Trains the five core PathSnap algorithm families on the 80 training trips using
 leakage-free 5-fold trip-grouped cross-validation (GroupKFold), evaluates all models
 on the 10 held-out student-testing trips, writes real-time training status/log files,
 generates all Section 3.3 visualisations, persists compressed model artifacts, and
 exports calibrated candidate probabilities and a Bayesian-only CV objective hook for
-Member 3's Bayesian Hyperparameter Optimisation & HMM/Viterbi pipeline.
+Bayesian Hyperparameter Optimisation & HMM/Viterbi route reconstruction.
 """
 from __future__ import annotations
 
@@ -47,7 +47,10 @@ from models.schema_adapter import (
 )
 
 logger = logging.getLogger("pathsnap.models.train")
-DEFAULT_ARTIFACTS_DIR = Path("models") / "artifacts"
+DEFAULT_MODELS_DIR = Path("artifacts") / "models"
+DEFAULT_RESULTS_DIR = Path("experiments") / "results"
+DEFAULT_PLOTS_DIR = Path("experiments") / "results" / "graphs"
+DEFAULT_CACHE_DIR = Path("data") / "processed"
 
 
 class LiveProgressTracker:
@@ -131,7 +134,7 @@ def save_final_model(model: Any, path: str | Path) -> None:
 
 
 def load_final_model(path: str | Path) -> Any:
-    """Load a persisted Member 2 model pipeline from disk."""
+    """Load a persisted model pipeline from disk."""
     in_path = Path(path)
     if not in_path.exists():
         raise FileNotFoundError(f"Saved model artifact not found: {in_path}")
@@ -139,7 +142,7 @@ def load_final_model(path: str | Path) -> Any:
 
 
 def predict_candidate_probabilities(model: Any, X: pd.DataFrame | np.ndarray) -> np.ndarray:
-    """Predict positive-class candidate probabilities P(match=1 | x) for Member 3/4."""
+    """Predict positive-class candidate probabilities P(match=1 | x)."""
     _, proba = _predict_positive_proba(model, X)
     return proba
 
@@ -243,19 +246,26 @@ def _select_trip_stratified_train_diag_slice(
 
 def run_all_experiments(
     data_root: Path | str = DEFAULT_RAW_ROOT,
-    artifacts_dir: Path | str = DEFAULT_ARTIFACTS_DIR,
+    artifacts_dir: Path | str | None = None,
     train_source: Path | str | None = None,
     test_source: Path | str | None = None,
     top_k: int = 6,
     n_splits: int = 5,
     include_mlp: bool = False,
 ) -> dict[str, Any]:
-    """Execute full Member 2 model training, grouped CV, evaluation, plotting, and export."""
-    artifacts_root = Path(artifacts_dir)
-    models_dir = artifacts_root / "models"
-    results_dir = artifacts_root / "results"
-    plots_dir = artifacts_root / "plots"
-    for d in (models_dir, results_dir, plots_dir):
+    """Execute full model training, grouped CV, evaluation, plotting, and export."""
+    if artifacts_dir is None:
+        models_dir = DEFAULT_MODELS_DIR
+        results_dir = DEFAULT_RESULTS_DIR
+        plots_dir = DEFAULT_PLOTS_DIR
+        cache_dir = DEFAULT_CACHE_DIR
+    else:
+        artifacts_root = Path(artifacts_dir)
+        models_dir = artifacts_root / "models"
+        results_dir = artifacts_root / "results"
+        plots_dir = artifacts_root / "plots"
+        cache_dir = artifacts_root / "cache"
+    for d in (models_dir, results_dir, plots_dir, cache_dir):
         d.mkdir(parents=True, exist_ok=True)
 
     specs = get_model_specs(include_mlp=include_mlp)
@@ -263,7 +273,7 @@ def run_all_experiments(
     tracker.update(status="RUNNING", current_model="Dataset Loader", current_stage="Loading train & student_test features")
 
     if train_source is not None and test_source is not None:
-        logger.info("Loading Member 1 external datasets: train=%s, test=%s", train_source, test_source)
+        logger.info("Loading external feature datasets: train=%s, test=%s", train_source, test_source)
         X_train, y_train, meta_train = load_feature_dataset(train_source)
         X_test, y_test, meta_test = load_feature_dataset(test_source)
         train_graphs, test_graphs = {}, {}
@@ -273,14 +283,14 @@ def run_all_experiments(
             partition="train",
             data_root=data_root,
             top_k=top_k,
-            cache_dir=artifacts_root / "cache",
+            cache_dir=cache_dir,
             use_cache=True,
         )
         X_test, y_test, meta_test, test_graphs = build_partition_dataset(
             partition="student_test",
             data_root=data_root,
             top_k=top_k,
-            cache_dir=artifacts_root / "cache",
+            cache_dir=cache_dir,
             use_cache=True,
         )
 
@@ -475,7 +485,7 @@ def run_all_experiments(
     best_proba = student_test_probas[selected_key]
     handoff_df["pred_prob"] = best_proba
     handoff_df["pred_log_prob"] = np.log(np.clip(best_proba, 1e-15, 1.0))
-    handoff_df.to_csv(results_dir / "m3_handoff_student_test_probabilities.csv.gz", index=False, compression="gzip")
+    handoff_df.to_csv(results_dir / "student_test_candidate_probabilities.csv.gz", index=False, compression="gzip")
 
     detailed_payload = {
         "tuning_policy": "Bayesian Hyperparameter Optimisation Only (zero GridSearchCV or RandomizedSearchCV)",
@@ -516,11 +526,11 @@ def run_all_experiments(
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="PathSnap Member 2 Model Experimentation & Selection")
+    parser = argparse.ArgumentParser(description="PathSnap Model Experimentation & Selection")
     parser.add_argument("--data-root", type=str, default=str(DEFAULT_RAW_ROOT), help="Path to Student folder raw trips")
-    parser.add_argument("--artifacts-dir", type=str, default=str(DEFAULT_ARTIFACTS_DIR), help="Output directory for models/results/plots")
-    parser.add_argument("--train-source", type=str, default=None, help="Optional Member 1 processed train feature file")
-    parser.add_argument("--test-source", type=str, default=None, help="Optional Member 1 processed student_test feature file")
+    parser.add_argument("--artifacts-dir", type=str, default=None, help="Optional root override for models/results/plots")
+    parser.add_argument("--train-source", type=str, default=None, help="Optional processed train feature file")
+    parser.add_argument("--test-source", type=str, default=None, help="Optional processed student_test feature file")
     parser.add_argument("--top-k", type=int, default=6, help="Candidates per GPS observation (for standalone spatial extraction)")
     parser.add_argument("--n-splits", type=int, default=5, help="Number of GroupKFold CV splits")
     parser.add_argument("--include-mlp", action="store_true", help="Also include MLPClassifier alongside the 5 Phase 1 models")

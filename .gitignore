@@ -19,8 +19,6 @@ frontend/.vite/
 # Local duplicate dataset
 /data/Student folder/
 
-# Synthetic experiment results
-/experiments/results/
 # Generated frontend build
 /frontend/dist/
 .env

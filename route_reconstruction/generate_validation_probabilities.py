@@ -1,6 +1,6 @@
 """
 PathSnap - Out-of-Fold Validation Probabilities
-Member 3 - Phase 2
+HMM Validation
 """
 
 import time

@@ -1,4 +1,4 @@
-"""Focused tests for Member 3 route reconstruction."""
+"""Focused tests for PathSnap HMM route reconstruction and constrained recovery."""
 
 import numpy as np
 import pandas as pd

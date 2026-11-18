@@ -1,4 +1,4 @@
-"""Dataset inventory and format exploration for the Member 1 workflow.
+"""Dataset inventory and format exploration utilities.
 
 The functions in this module are read-only. They inspect files as raw text and
 use pandas only for type, shape, missing-value, and sample-record summaries.

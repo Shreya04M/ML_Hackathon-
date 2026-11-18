@@ -1,4 +1,4 @@
-"""Unit tests for Member 2 ML models, metrics, GroupKFold CV, and serving artifacts."""
+"""Unit tests for PathSnap ML models, metrics, GroupKFold CV, and serving artifacts."""
 from pathlib import Path
 import numpy as np
 import pandas as pd

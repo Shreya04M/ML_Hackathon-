@@ -20,16 +20,11 @@ from route_reconstruction.route_recovery import recover_continuous_route
 
 
 INPUT_PATH = Path(
-    "models/artifacts/results/"
-    "m3_handoff_student_test_probabilities.csv.gz"
+    "experiments/results/"
+    "student_test_candidate_probabilities.csv.gz"
 )
-PARAMETER_PATH = Path(
-    "route_reconstruction/experiments/phase2_improved/"
-    "hmm_optimisation/best_hmm_parameters.json"
-)
-OUTPUT_DIR = Path(
-    "route_reconstruction/experiments/phase2_improved"
-)
+PARAMETER_PATH = Path("artifacts/hmm/best_hmm_parameters.json")
+OUTPUT_DIR = Path("experiments/results")
 BASELINE_DIR = Path("experiments/results")
 MAX_SPEED_MPS = 60.0
 GPS_TOLERANCE_M = 30.0
@@ -485,7 +480,7 @@ def main(
         },
     }
 
-    trip_metrics.to_csv(output_dir / "per_trip_comparison.csv", index=False)
+    trip_metrics.to_csv(output_dir / "phase2_per_trip_comparison.csv", index=False)
     prediction_output = combined_predictions.drop(
         columns=["ref_arc_id"],
         errors="ignore",
@@ -494,11 +489,11 @@ def main(
         output_dir / "reconstructed_predictions.csv",
         index=False,
     )
-    with (output_dir / "recovered_routes.json").open(
+    with (output_dir / "phase2_recovered_routes.json").open(
         "w", encoding="utf-8"
     ) as file:
         json.dump(new_routes, file, indent=2)
-    with (output_dir / "overall_metrics.json").open(
+    with (output_dir / "phase2_overall_metrics.json").open(
         "w", encoding="utf-8"
     ) as file:
         json.dump(summary, file, indent=2)
