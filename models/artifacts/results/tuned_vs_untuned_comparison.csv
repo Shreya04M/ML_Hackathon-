@@ -1,0 +1,3 @@
+Variant,CV Macro F1-score,CV Macro F1 Std,Student-Test Top-1 Accuracy,Student-Test Macro F1-score,Log Loss,Route Continuity,Sequence F1,Inference Time (s),Train Time (s)
+Untuned HistGradientBoosting (Baseline),0.8608,0.0492,0.879,0.8928,0.1672,0.9212,0.8771,0.3112,12.36
+Bayesian-Tuned HistGradientBoosting (GP-EI),0.8659,0.0475,0.8777,0.8998,0.1583,0.9209,0.8799,0.2726,12.25

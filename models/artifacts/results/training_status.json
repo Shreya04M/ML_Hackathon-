@@ -1,0 +1,17 @@
+{
+  "status": "COMPLETED",
+  "percent_complete": 100.0,
+  "completed_steps": 35,
+  "total_steps": 35,
+  "current_model": "Random Forest",
+  "current_stage": "All experiments, artifacts & plots complete",
+  "completed_models": [
+    "Logistic Regression",
+    "KNN (Distance-Weighted)",
+    "Decision Tree",
+    "Random Forest",
+    "HistGradientBoosting"
+  ],
+  "elapsed_s": 812.04,
+  "updated_at": "2026-11-18T11:17:36"
+}

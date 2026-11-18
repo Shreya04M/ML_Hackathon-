@@ -23,3 +23,10 @@ frontend/.vite/
 /experiments/results/
 # Generated frontend build
 /frontend/dist/
+.env
+*.pyc
+
+data/raw/*
+data/processed/*
+
+node_modules/
