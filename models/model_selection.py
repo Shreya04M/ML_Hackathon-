@@ -230,6 +230,7 @@ def run_grouped_cross_validation(
     meta_df: pd.DataFrame | None = None,
     road_graphs: dict[str, dict[str, np.ndarray]] | None = None,
     n_splits: int = 5,
+    on_fold_complete: Callable[[int, int, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run leakage-free trip-grouped GroupKFold cross-validation on training trips."""
     y_arr = np.asarray(y, dtype=np.int64)
@@ -270,6 +271,9 @@ def run_grouped_cross_validation(
         fold_metrics["fold"] = fold_idx
         fold_metrics["n_val_trips"] = len(val_trips)
         fold_records.append(fold_metrics)
+
+        if on_fold_complete is not None:
+            on_fold_complete(fold_idx, n_splits, fold_metrics)
 
     scalar_keys = [
         "accuracy",
@@ -395,3 +399,43 @@ def select_best_model(results: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "selected_name": results[best_key]["name"] if best_key else None,
         "ranking": scored_candidates,
     }
+
+
+def create_bayesian_cv_objective(
+    model_factory: Callable[..., Any],
+    X: pd.DataFrame | np.ndarray,
+    y: np.ndarray,
+    groups: np.ndarray,
+    n_splits: int = 5,
+    metric: str = "f1_macro",
+) -> Callable[[dict[str, Any]], float]:
+    """Create a GroupKFold CV objective strictly for Bayesian hyperparameter optimisation.
+
+    Designed exclusively for Bayesian surrogate optimisers (e.g., Optuna TPE or
+    scikit-optimize GP-Minimize) in Member 3's tuning pipeline. Member 2 performs zero
+    grid search or random search during model experimentation and selection.
+    """
+    y_arr = np.asarray(y, dtype=np.int64)
+    groups_arr = np.asarray(groups)
+    splits = list(GroupKFold(n_splits=n_splits).split(X, y_arr, groups_arr))
+    is_df = isinstance(X, pd.DataFrame)
+
+    def objective(params: dict[str, Any]) -> float:
+        fold_scores: list[float] = []
+        for tr_idx, val_idx in splits:
+            X_tr = X.iloc[tr_idx] if is_df else X[tr_idx]
+            X_val = X.iloc[val_idx] if is_df else X[val_idx]
+            y_tr, y_val = y_arr[tr_idx], y_arr[val_idx]
+
+            estimator = model_factory(**params)
+            estimator.fit(X_tr, y_tr)
+            y_pred, y_proba = _predict_positive_proba(estimator, X_val)
+            if metric == "f1_macro":
+                fold_scores.append(float(f1_score(y_val, y_pred, average="macro", zero_division=0)))
+            elif metric == "neg_log_loss":
+                fold_scores.append(-float(log_loss(y_val, y_proba, labels=[0, 1])))
+            else:
+                raise ValueError(f"Unsupported Bayesian CV objective metric: {metric}")
+        return float(np.mean(fold_scores))
+
+    return objective

@@ -1,16 +1,19 @@
-"""End-to-end training orchestrator, artifact persistence, and Member 3/4 handoffs.
+"""End-to-end training orchestrator, live progress tracker, and Member 3/4 handoffs.
 
 Trains the five core PathSnap algorithm families on the 80 training trips using
 leakage-free 5-fold trip-grouped cross-validation (GroupKFold), evaluates all models
-on the 10 held-out student-testing trips, generates all Section 3.3 visualisations,
-persists compressed model artifacts and experiment logs, and exports calibrated
-candidate probabilities for Member 3's Bayesian Optimisation & HMM/Viterbi pipeline.
+on the 10 held-out student-testing trips, writes real-time training status/log files,
+generates all Section 3.3 visualisations, persists compressed model artifacts, and
+exports calibrated candidate probabilities and a Bayesian-only CV objective hook for
+Member 3's Bayesian Hyperparameter Optimisation & HMM/Viterbi pipeline.
 """
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import logging
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -39,15 +42,71 @@ from models.plots import generate_all_plots
 from models.random_forest import get_random_forest_spec
 from models.schema_adapter import (
     DEFAULT_RAW_ROOT,
-    FEATURE_COLUMNS,
     build_partition_dataset,
     load_feature_dataset,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger("pathsnap.models.train")
 DEFAULT_ARTIFACTS_DIR = Path("models") / "artifacts"
+
+
+class LiveProgressTracker:
+    """Writes unbuffered live training progress to JSON and log files."""
+
+    def __init__(self, results_dir: Path, total_models: int, n_splits: int) -> None:
+        self.results_dir = results_dir
+        self.results_dir.mkdir(parents=True, exist_ok=True)
+        self.log_path = self.results_dir / "training_progress.log"
+        self.status_path = self.results_dir / "training_status.json"
+        self.total_steps = total_models * (n_splits + 2)
+        self.completed_steps = 0
+        self.completed_models: list[str] = []
+        self.start_time = time.perf_counter()
+        self._configure_file_logger()
+
+    def _configure_file_logger(self) -> None:
+        logger.setLevel(logging.INFO)
+        logger.handlers.clear()
+        fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+
+        stream_h = logging.StreamHandler(sys.stdout)
+        stream_h.setFormatter(fmt)
+        logger.addHandler(stream_h)
+
+        file_h = logging.FileHandler(self.log_path, mode="w", encoding="utf-8")
+        file_h.setFormatter(fmt)
+        logger.addHandler(file_h)
+
+    def update(
+        self,
+        status: str,
+        current_model: str,
+        current_stage: str,
+        advance: int = 0,
+        completed_model_name: str | None = None,
+    ) -> None:
+        """Advance step counter and atomically update ``training_status.json``."""
+        self.completed_steps = min(self.total_steps, self.completed_steps + advance)
+        if completed_model_name and completed_model_name not in self.completed_models:
+            self.completed_models.append(completed_model_name)
+
+        pct = round(100.0 * self.completed_steps / max(self.total_steps, 1), 1)
+        payload = {
+            "status": status,
+            "percent_complete": 100.0 if status == "COMPLETED" else pct,
+            "completed_steps": self.completed_steps,
+            "total_steps": self.total_steps,
+            "current_model": current_model,
+            "current_stage": current_stage,
+            "completed_models": list(self.completed_models),
+            "elapsed_s": round(time.perf_counter() - self.start_time, 2),
+            "updated_at": dt.datetime.now().isoformat(timespec="seconds"),
+        }
+        tmp_path = self.status_path.with_suffix(".tmp")
+        tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        tmp_path.replace(self.status_path)
+        for handler in logger.handlers:
+            handler.flush()
 
 
 def get_model_specs(include_mlp: bool = False) -> list[dict[str, Any]]:
@@ -117,7 +176,8 @@ def _compute_per_trip_breakdown(
     model_name: str,
 ) -> pd.DataFrame:
     """Compute per-trip Top-1 accuracy, miss rate, and continuity across student_test trips."""
-    work = meta_df[["trip_id", "obs_id", "candidate_arc_id", "from_node_id", "to_node_id", "ref_arc_id", "is_ref_in_candidates"]].copy()
+    cols = ["trip_id", "obs_id", "candidate_arc_id", "from_node_id", "to_node_id", "ref_arc_id", "is_ref_in_candidates"]
+    work = meta_df[cols].copy()
     work["prob"] = y_proba
     work["_ord"] = np.arange(len(work))
     top1 = (
@@ -165,9 +225,26 @@ def _format_markdown_comparison_table(df: pd.DataFrame) -> str:
     sep = "| " + " | ".join(["---"] * len(cols)) + " |"
     lines = [header, sep]
     for _, row in sub.iterrows():
-        vals = [str(row[c]) for c in cols]
-        lines.append("| " + " | ".join(vals) + " |")
+        lines.append("| " + " | ".join(str(row[c]) for c in cols) + " |")
     return "\n".join(lines)
+
+
+def _select_trip_stratified_train_diag_slice(
+    meta_train: pd.DataFrame,
+    max_rows: int = 120_000,
+) -> np.ndarray:
+    """Select complete trips deterministically (~120k rows) for fast train-fit overfitting diagnostics."""
+    if len(meta_train) <= max_rows or "trip_id" not in meta_train.columns:
+        return np.arange(len(meta_train), dtype=np.int64)
+    chosen_trips: list[str] = []
+    acc = 0
+    for trip_id, cnt in meta_train.groupby("trip_id", sort=True).size().items():
+        if acc + int(cnt) > max_rows and chosen_trips:
+            break
+        chosen_trips.append(str(trip_id))
+        acc += int(cnt)
+    mask = meta_train["trip_id"].isin(chosen_trips).to_numpy()
+    return np.flatnonzero(mask)
 
 
 def run_all_experiments(
@@ -187,7 +264,10 @@ def run_all_experiments(
     for d in (models_dir, results_dir, plots_dir):
         d.mkdir(parents=True, exist_ok=True)
 
-    # 1. Load datasets (either Member 1 feature files or standalone spatial extraction).
+    specs = get_model_specs(include_mlp=include_mlp)
+    tracker = LiveProgressTracker(results_dir=results_dir, total_models=len(specs), n_splits=n_splits)
+    tracker.update(status="RUNNING", current_model="Dataset Loader", current_stage="Loading train & student_test features")
+
     if train_source is not None and test_source is not None:
         logger.info("Loading Member 1 external datasets: train=%s, test=%s", train_source, test_source)
         X_train, y_train, meta_train = load_feature_dataset(train_source)
@@ -222,7 +302,11 @@ def run_all_experiments(
         100.0 * float(np.mean(y_test)),
     )
 
-    specs = get_model_specs(include_mlp=include_mlp)
+    diag_idx = _select_trip_stratified_train_diag_slice(meta_train, max_rows=120_000)
+    X_train_diag = X_train.iloc[diag_idx]
+    y_train_diag = y_train[diag_idx]
+    meta_train_diag = meta_train.iloc[diag_idx].reset_index(drop=True)
+
     all_results: dict[str, dict[str, Any]] = {}
     trained_models: dict[str, Any] = {}
     histories: dict[str, dict[str, list[float]]] = {}
@@ -230,7 +314,6 @@ def run_all_experiments(
     per_trip_frames: list[pd.DataFrame] = []
     student_test_probas: dict[str, np.ndarray] = {}
 
-    # Fixed 15,000-row sample of student_test for fast permutation importance when needed.
     rng = np.random.default_rng(42)
     sample_n = min(15_000, len(X_test))
     sample_idx = np.sort(rng.choice(len(X_test), size=sample_n, replace=False))
@@ -240,7 +323,27 @@ def run_all_experiments(
     for spec in specs:
         key = spec["key"]
         name = spec["name"]
-        logger.info("=== Running 5-fold GroupKFold CV & Student-Test Evaluation: %s ===", name)
+        logger.info("=== [%s] Starting 5-fold GroupKFold CV & Student-Test Evaluation ===", name)
+        tracker.update(status="RUNNING", current_model=name, current_stage="Starting 5-fold GroupKFold CV")
+
+        def _on_fold(fold_idx: int, total_folds: int, fold_m: dict[str, Any], _name: str = name) -> None:
+            logger.info(
+                "  [%s] Fold %d/%d | Macro-F1=%.4f | Top-1=%.4f | LogLoss=%.4f | fit=%.2fs | inf=%.2fs",
+                _name,
+                fold_idx,
+                total_folds,
+                fold_m["f1_macro"],
+                fold_m["top1_accuracy"] or 0.0,
+                fold_m["log_loss"],
+                fold_m["train_time_s"] or 0.0,
+                fold_m["inference_time_s"],
+            )
+            tracker.update(
+                status="RUNNING",
+                current_model=_name,
+                current_stage=f"Completed CV fold {fold_idx}/{total_folds}",
+                advance=1,
+            )
 
         cv_res = run_grouped_cross_validation(
             model_factory=spec["factory"],
@@ -250,20 +353,22 @@ def run_all_experiments(
             meta_df=meta_train,
             road_graphs=train_graphs,
             n_splits=n_splits,
+            on_fold_complete=_on_fold,
         )
         cv_res.pop("_oof_proba", None)
 
-        # Fit final untuned model on all 80 training trips.
+        tracker.update(status="RUNNING", current_model=name, current_stage="Fitting on full 80 training trips")
         model = spec["factory"]()
         t_fit0 = time.perf_counter()
         model.fit(X_train, y_train)
         train_time_s = float(time.perf_counter() - t_fit0)
+        tracker.update(status="RUNNING", current_model=name, current_stage="Evaluating train diagnostics & student_test", advance=1)
 
         train_fit_metrics = evaluate_model(
             model,
-            X_train,
-            y_train,
-            meta_df=meta_train,
+            X_train_diag,
+            y_train_diag,
+            meta_df=meta_train_diag,
             road_graphs=train_graphs,
             train_time_s=train_time_s,
         )
@@ -283,7 +388,6 @@ def run_all_experiments(
         if {"from_node_id", "to_node_id"}.issubset(meta_test.columns):
             per_trip_frames.append(_compute_per_trip_breakdown(meta_test, st_proba, name))
 
-        # Record genuine iterative history only when supported by the algorithm.
         if key == "hist_gradient_boosting":
             hist = extract_hgb_history(model)
             if hist:
@@ -302,7 +406,7 @@ def run_all_experiments(
         trained_models[key] = model
 
         logger.info(
-            "%s | CV Macro-F1=%.4f (±%.4f) | Test Top-1=%.4f | Test Macro-F1=%.4f | LogLoss=%.4f | Continuity=%.4f | Inf=%.3fs",
+            "[%s] SUMMARY | CV Macro-F1=%.4f (±%.4f) | Test Top-1=%.4f | Test Macro-F1=%.4f | LogLoss=%.4f | Continuity=%.4f | Fit=%.2fs | Inf=%.3fs",
             name,
             cv_res["f1_macro_mean"],
             cv_res["f1_macro_std"],
@@ -310,7 +414,15 @@ def run_all_experiments(
             st_metrics["f1_macro"],
             st_metrics["log_loss"],
             st_metrics["route_continuity"] or 0.0,
+            train_time_s,
             st_metrics["inference_time_s"],
+        )
+        tracker.update(
+            status="RUNNING",
+            current_model=name,
+            current_stage=f"Completed evaluation & saved {model_path.name}",
+            advance=1,
+            completed_model_name=name,
         )
 
         all_results[key] = {
@@ -327,7 +439,6 @@ def run_all_experiments(
             "student_test": st_metrics,
         }
 
-    # 2. Compare models and select the winner based on multi-criteria generalisation & calibration.
     comparison_df = compare_models(all_results)
     selection = select_best_model(all_results)
     selected_key = selection["selected_key"]
@@ -339,6 +450,7 @@ def run_all_experiments(
     selected_meta = {
         "selected_key": selected_key,
         "selected_name": selection["selected_name"],
+        "tuning_policy": "Bayesian Hyperparameter Optimisation Only (no GridSearch or RandomSearch)",
         "ranking": selection["ranking"],
         "feature_columns": feature_names,
         "top_k": top_k,
@@ -354,14 +466,15 @@ def run_all_experiments(
     with open(models_dir / "selected_model_metadata.json", "w", encoding="utf-8") as fh:
         json.dump(selected_meta, fh, indent=2)
 
-    # 3. Export comparison tables, detailed JSON logs, per-trip diagnostics, and M3 handoff probabilities.
     comparison_df.to_csv(results_dir / "section_3_1_model_comparison.csv", index=False)
-    md_table = _format_markdown_comparison_table(comparison_df)
-    (results_dir / "section_3_1_model_comparison.md").write_text(md_table + "\n", encoding="utf-8")
+    (results_dir / "section_3_1_model_comparison.md").write_text(
+        _format_markdown_comparison_table(comparison_df) + "\n", encoding="utf-8"
+    )
 
     if per_trip_frames:
-        per_trip_df = pd.concat(per_trip_frames, ignore_index=True)
-        per_trip_df.to_csv(results_dir / "per_trip_student_test_breakdown.csv", index=False)
+        pd.concat(per_trip_frames, ignore_index=True).to_csv(
+            results_dir / "per_trip_student_test_breakdown.csv", index=False
+        )
 
     handoff_df = meta_test.copy()
     handoff_df["label"] = y_test
@@ -371,6 +484,7 @@ def run_all_experiments(
     handoff_df.to_csv(results_dir / "m3_handoff_student_test_probabilities.csv.gz", index=False, compression="gzip")
 
     detailed_payload = {
+        "tuning_policy": "Bayesian Hyperparameter Optimisation Only (zero GridSearchCV or RandomizedSearchCV)",
         "dataset_summary": {
             "train_rows": int(len(X_train)),
             "train_trips": int(pd.Series(groups_train).nunique()),
@@ -388,7 +502,6 @@ def run_all_experiments(
     with open(results_dir / "detailed_experiment_results.json", "w", encoding="utf-8") as fh:
         json.dump(detailed_payload, fh, indent=2)
 
-    # 4. Generate all compulsory Section 3.3 visualisations.
     saved_plots = generate_all_plots(
         results=all_results,
         histories=histories,
@@ -398,6 +511,7 @@ def run_all_experiments(
     )
     logger.info("Saved %d Section 3.3 visualisations to %s", len(saved_plots), plots_dir)
     logger.info("Selected Best Model: %s (%s)", selection["selected_name"], best_model_path)
+    tracker.update(status="COMPLETED", current_model=selection["selected_name"], current_stage="All experiments, artifacts & plots complete")
 
     return {
         "comparison_table": comparison_df,

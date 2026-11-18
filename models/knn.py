@@ -18,7 +18,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "metric": "minkowski",
     "p": 2,
     "n_jobs": -1,
-    "max_train_samples": 120_000,
+    "max_train_samples": 25_000,
     "random_state": 42,
 }
 
@@ -41,7 +41,7 @@ class StratifiedSubsampledKNN(BaseEstimator, ClassifierMixin):
         metric: str = "minkowski",
         p: int = 2,
         n_jobs: int = -1,
-        max_train_samples: int | None = 120_000,
+        max_train_samples: int | None = 25_000,
         random_state: int = 42,
     ) -> None:
         self.n_neighbors = n_neighbors
