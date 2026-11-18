@@ -75,8 +75,9 @@ def _expected_improvement(
     xi: float = 0.002,
 ) -> np.ndarray:
     """Compute Gaussian-Process Expected Improvement acquisition score."""
-    mu, sigma = gp.predict(candidates_u, return_std=True)
-    sigma = np.maximum(sigma, 1e-9)
+    pred = gp.predict(candidates_u, return_std=True)
+    mu = np.asarray(pred[0], dtype=np.float64)
+    sigma = np.maximum(np.asarray(pred[1], dtype=np.float64), 1e-9)
     imp = mu - y_best - xi
     z = imp / sigma
     ei = imp * norm.cdf(z) + sigma * norm.pdf(z)
