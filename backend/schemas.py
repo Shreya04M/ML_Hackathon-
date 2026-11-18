@@ -25,6 +25,8 @@ class RouteMetrics(BaseModel):
     route_f1: float
     jaccard_similarity: float
     exact_route_match: bool
+    sequence_lcs_f1: float | None = None
+    road_overlap_f1: float | None = None
 
 
 class PredictionResponse(BaseModel):

@@ -38,50 +38,45 @@ Metrics are computed on the backend, not the frontend.
 
 From the project root:
 
-```bash
+```powershell
 cd frontend
-npm ci
+npm install
 ```
 
 ## Local Development
 
-```bash
+```powershell
 npm run dev
 ```
 
-Open http://localhost:5173
+Open `http://localhost:5173`.
 
-## Two-Laptop Deployment
+## Two-Laptop Deployment (Laptop 2 — UI Client)
 
-Connect both laptops to the same accessible network.
+Connect Laptop 1 (FastAPI server) and Laptop 2 (React UI) to the same Mobile Hotspot or Wi-Fi/LAN.
 
-On Laptop 1, start the FastAPI backend and obtain
-its IPv4 address using ipconfig.
+On Laptop 1, obtain its IPv4 address with `ipconfig` and ensure FastAPI is listening on `--host 0.0.0.0 --port 8000`.
 
-On Laptop 2, open PowerShell in the frontend directory:
+On Laptop 2, verify Laptop 1 is reachable and launch Vite pointing to Laptop 1:
 
 ```powershell
-$env:VITE_API_URL="http://BACKEND_IP:8000"
-npm run dev
+cd frontend
+Invoke-RestMethod http://<LAPTOP_1_IP>:8000/health
+$env:VITE_API_BASE_URL = "http://<LAPTOP_1_IP>:8000"
+npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
-Replace BACKEND_IP with Laptop 1's actual IPv4 address.
+*(Both `VITE_API_BASE_URL` and `VITE_API_URL` are read by [src/services/api.js](./src/services/api.js), or can be placed inside `frontend/.env`.)*
 
-Open http://localhost:5173 on Laptop 2.
+Open `http://localhost:5173` on Laptop 2.
 
 ## Production Build
 
-```bash
+```powershell
 npm run build
 ```
 
 ## Implementation Status
 
-The frontend has passed browser testing and production
-build verification.
-
-Backend connectivity through the server's network IP
-has been tested on the same laptop.
-
-Actual cross-device testing and end-to-end reconstructed
-route display remain pending model and HMM integration.
+- Full UI integrated with the live ML + Distance HMM/Viterbi backend across all 3 views (`Live Evaluation`, `Model Benchmarks`, and `Pipeline Architecture`).
+- Verified with `npm run build` (`vite build` production bundle) and live FastAPI endpoints (`GET /health`, `GET /trips`, `POST /predict`).

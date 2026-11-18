@@ -78,9 +78,8 @@ HMM_PARAM_PATH = (
 )
 
 
-def list_available_trips() -> list[str]:
-    """Discover valid trips from the active dataset directory."""
-    data_dir = _resolve_data_dir()
+def _discover_trips(data_dir: Path) -> list[str]:
+    """Discover valid trips from a dataset directory without logging."""
     if not data_dir.is_dir():
         raise FileNotFoundError(f"Trip dataset not available at {data_dir}")
 
@@ -98,6 +97,19 @@ def list_available_trips() -> list[str]:
             trip_ids.append(trip_id)
 
     return sorted(trip_ids)
+
+
+def list_available_trips() -> list[str]:
+    """Discover valid trips from the active dataset directory."""
+    data_dir = _resolve_data_dir()
+    trips = _discover_trips(data_dir)
+    logger.info(
+        "[GET /trips] data_dir=%s | discovered=%d | trips=%s",
+        data_dir.name,
+        len(trips),
+        trips,
+    )
+    return trips
 
 
 @lru_cache(maxsize=1)
@@ -159,9 +171,14 @@ def _compute_server_side_pointwise_accuracy(
 def predict_trip(trip_id: str) -> dict[str, Any]:
     """Run live feature extraction, ML inference, HMM/Viterbi decoding, and evaluation."""
     data_dir = _resolve_data_dir()
-    if trip_id not in list_available_trips():
+    if trip_id not in _discover_trips(data_dir):
         raise ValueError(f"Invalid trip ID: {trip_id}")
 
+    logger.info(
+        "[POST /predict] START data_dir=%s | trip_id=%s | route=None (ground truth isolated from model)",
+        data_dir.name,
+        trip_id,
+    )
     started_at = perf_counter()
     trip_dir = data_dir / trip_id
     track = np.loadtxt(trip_dir / f"{trip_id}.track", dtype=np.float64, ndmin=2)
@@ -237,8 +254,9 @@ def predict_trip(trip_id: str) -> dict[str, Any]:
     map_html = generate_trip_map(trip_id, predicted_route)
 
     logger.info(
-        "[POST /predict] data_dir=%s | trip_id=%s | gps_obs=%d | candidates=%d | "
-        "model=%s | hmm_obs_arcs=%d | recovered_arcs=%d | acc=%.4f | route_f1=%.4f | latency=%.3fs",
+        "[POST /predict] COMPLETE data_dir=%s | trip_id=%s | gps_obs=%d | candidates=%d | "
+        "model=%s | hmm_obs_arcs=%d | recovered_arcs=%d | acc=%.4f | route_f1=%.4f | "
+        "precision=%.4f | recall=%.4f | jaccard=%.4f | road_overlap_f1=%.4f | latency=%.3fs",
         data_dir.name,
         trip_id,
         len(track),
@@ -248,6 +266,10 @@ def predict_trip(trip_id: str) -> dict[str, Any]:
         len(predicted_route),
         float(metrics["accuracy"]) if metrics and metrics.get("accuracy") is not None else -1.0,
         float(metrics["route_f1"]) if metrics else -1.0,
+        float(metrics["route_precision"]) if metrics else -1.0,
+        float(metrics["route_recall"]) if metrics else -1.0,
+        float(metrics["jaccard_similarity"]) if metrics else -1.0,
+        float(metrics["road_overlap_f1"]) if metrics and metrics.get("road_overlap_f1") is not None else -1.0,
         elapsed_s,
     )
 
@@ -267,7 +289,7 @@ def generate_trip_map(
 ) -> str:
     """Generate a Folium map with road network, raw GPS, and predicted route (no ground truth)."""
     data_dir = _resolve_data_dir()
-    if trip_id not in list_available_trips():
+    if trip_id not in _discover_trips(data_dir):
         raise ValueError(f"Invalid trip ID: {trip_id}")
 
     trip_dir = data_dir / trip_id
@@ -323,4 +345,19 @@ def generate_trip_map(
 
     route_map.fit_bounds(coordinates)
     folium.LayerControl().add_to(route_map)
+    if predicted_route is None:
+        logger.info(
+            "[GET /map/%s] Rendered raw Folium map (gps_points=%d, road_arcs=%d, ground_truth_exposed=False)",
+            trip_id,
+            len(coordinates),
+            len(road_segments),
+        )
+    else:
+        logger.info(
+            "[MAP RENDER] trip_id=%s | gps_points=%d | road_arcs=%d | predicted_arcs=%d | ground_truth_exposed=False",
+            trip_id,
+            len(coordinates),
+            len(road_segments),
+            len(predicted_route),
+        )
     return route_map.get_root().render()
