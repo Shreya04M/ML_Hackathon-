@@ -42,6 +42,7 @@ export async function predictTrip(tripId) {
     }),
   });
 }
+
 export function getTripMapUrl(tripId) {
   return `${API_URL}/map/${encodeURIComponent(tripId)}`;
 }
