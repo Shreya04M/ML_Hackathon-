@@ -15,3 +15,9 @@ logs/
 node_modules/
 frontend/.vite/
 # Do not blanket-ignore data/ or artifacts/; use Git LFS/approved storage for large files.
+
+# Local duplicate dataset
+/data/Student folder/
+
+# Synthetic experiment results
+/experiments/results/
