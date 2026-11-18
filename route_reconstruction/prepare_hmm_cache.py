@@ -3,6 +3,8 @@ PathSnap - HMM Validation Cache
 Member 3 - Phase 2
 """
 
+import argparse
+import json
 import time
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from route_reconstruction.road_graph import (
 from route_reconstruction.distance_transition import (
     load_gps_track,
     candidate_road_distance,
+    project_fraction,
 )
 
 from route_reconstruction.emission_probability import (
@@ -30,13 +33,17 @@ INPUT_PATH = Path(
 )
 
 CACHE_DIR = Path(
-    "experiments/results/hmm_validation/cache"
+    "route_reconstruction/experiments/phase2_improved/"
+    "hmm_validation/cache"
 )
 
 TOP_K = 6
+BACKWARD_TOLERANCE_M = 30.0
 
 
-def prepare_trip(trip_id, candidates):
+def prepare_trip(trip_id, candidates, cache_dir=None):
+
+    cache_dir = Path(cache_dir or CACHE_DIR)
 
     graph = load_road_graph(
         trip_id,
@@ -182,6 +189,7 @@ def prepare_trip(trip_id, candidates):
                     arc_ids[t + 1, j],
                     gps1,
                     gps2,
+                    backward_tolerance_m=BACKWARD_TOLERANCE_M,
                 )
 
                 if np.isfinite(road_distance):
@@ -190,7 +198,7 @@ def prepare_trip(trip_id, candidates):
                         road_distance - gps_distance
                     )
 
-    output_path = CACHE_DIR / (
+    output_path = cache_dir / (
         f"trip_{int(trip_id):08d}.npz"
     )
 
@@ -209,14 +217,139 @@ def prepare_trip(trip_id, candidates):
     return n
 
 
-def main():
+def rebuild_cache_from_compatible_source(source_cache_dir, cache_dir):
+    """Rebuild the cache while reusing unaffected training distances."""
 
-    CACHE_DIR.mkdir(
+    source_cache_dir = Path(source_cache_dir)
+    cache_dir = Path(cache_dir)
+    files = sorted(source_cache_dir.glob("trip_*.npz"))
+
+    if len(files) != 80:
+        raise ValueError(
+            f"Expected 80 source cache files, found {len(files)}"
+        )
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    total_observations = 0
+    corrected_transitions = 0
+
+    for index, source_path in enumerate(files, start=1):
+        trip_id = int(source_path.stem.split("_", 1)[1])
+        graph = load_road_graph(trip_id, partition="train")
+        track = load_gps_track(trip_id, partition="train")
+
+        with np.load(source_path, allow_pickle=False) as data:
+            trip = {key: data[key] for key in data.files}
+
+        observation_ids = trip["observation_ids"]
+        counts = trip["candidate_counts"]
+        arc_ids = trip["arc_ids"]
+        distance_errors = trip["distance_errors"].copy()
+
+        if len(observation_ids) != len(counts):
+            raise ValueError(f"Invalid cached observations in {source_path}")
+
+        if (observation_ids < 0).any() or (
+            observation_ids >= len(track)
+        ).any():
+            raise ValueError(f"Invalid cached observation IDs in {source_path}")
+
+        for t in range(len(observation_ids) - 1):
+            gps1 = track[observation_ids[t], :2]
+            gps2 = track[observation_ids[t + 1], :2]
+            timestamp1 = track[observation_ids[t], 2]
+            timestamp2 = track[observation_ids[t + 1], 2]
+
+            if (
+                not np.isfinite(timestamp1)
+                or not np.isfinite(timestamp2)
+                or timestamp2 <= timestamp1
+            ):
+                distance_errors[t, :, :] = np.inf
+                continue
+
+            gps_distance = float(haversine_distance(gps1, gps2))
+
+            for i in range(int(counts[t])):
+                first_arc = int(arc_ids[t, i])
+                for j in range(int(counts[t + 1])):
+                    if first_arc != int(arc_ids[t + 1, j]):
+                        continue
+
+                    u, v = graph.arcs[first_arc]
+                    first_fraction = project_fraction(
+                        gps1, graph.nodes[u], graph.nodes[v]
+                    )
+                    second_fraction = project_fraction(
+                        gps2, graph.nodes[u], graph.nodes[v]
+                    )
+                    signed_distance = (
+                        second_fraction - first_fraction
+                    ) * graph.arc_lengths[first_arc]
+
+                    if (
+                        signed_distance < 0
+                        and abs(signed_distance)
+                        <= BACKWARD_TOLERANCE_M
+                    ):
+                        distance_errors[t, i, j] = gps_distance
+                        corrected_transitions += 1
+
+        trip["distance_errors"] = distance_errors
+        np.savez_compressed(cache_dir / source_path.name, **trip)
+        total_observations += len(observation_ids)
+
+        print(
+            f"Rebuilt {source_path.name} "
+            f"({index}/{len(files)}): {len(observation_ids)} observations",
+            flush=True,
+        )
+
+    if total_observations != 208417:
+        raise ValueError(
+            f"Expected 208,417 training observations, found {total_observations}"
+        )
+
+    metadata = {
+        "source_cache_dir": str(source_cache_dir),
+        "training_trips": len(files),
+        "observations": total_observations,
+        "corrected_same_arc_jitter_transitions": corrected_transitions,
+        "backward_tolerance_m": BACKWARD_TOLERANCE_M,
+        "unchanged_values": (
+            "All non-jitter transition errors and remaining arrays were "
+            "reused from the compatible training cache."
+        ),
+    }
+    with (cache_dir / "cache_metadata.json").open(
+        "w", encoding="utf-8"
+    ) as file:
+        json.dump(metadata, file, indent=2)
+
+    print("Corrected same-arc jitter transitions:", corrected_transitions)
+    print("Cache directory:", cache_dir)
+
+
+def main(
+    input_path=INPUT_PATH,
+    cache_dir=CACHE_DIR,
+    reuse_cache_dir=None,
+):
+
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    df = pd.read_csv(INPUT_PATH)
+    if reuse_cache_dir is not None:
+        rebuild_cache_from_compatible_source(
+            source_cache_dir=reuse_cache_dir,
+            cache_dir=cache_dir,
+        )
+        return
+
+    df = pd.read_csv(input_path)
 
     start_time = time.perf_counter()
 
@@ -239,6 +372,7 @@ def main():
         n = prepare_trip(
             trip_id,
             candidates,
+            cache_dir=cache_dir,
         )
 
         total_observations += n
@@ -260,8 +394,33 @@ def main():
         "seconds",
     )
 
-    print("Cache directory:", CACHE_DIR)
+    print("Cache directory:", cache_dir)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--input-path",
+        type=Path,
+        default=INPUT_PATH,
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=CACHE_DIR,
+    )
+    parser.add_argument(
+        "--reuse-cache-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Reuse mathematically unchanged distances from an 80-trip cache "
+            "and recalculate only affected entries."
+        ),
+    )
+    arguments = parser.parse_args()
+    main(
+        input_path=arguments.input_path,
+        cache_dir=arguments.cache_dir,
+        reuse_cache_dir=arguments.reuse_cache_dir,
+    )

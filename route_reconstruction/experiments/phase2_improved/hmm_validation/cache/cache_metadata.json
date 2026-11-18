@@ -1,0 +1,8 @@
+{
+  "source_cache_dir": "experiments\\results\\hmm_validation\\cache",
+  "training_trips": 80,
+  "observations": 208417,
+  "corrected_same_arc_jitter_transitions": 262442,
+  "backward_tolerance_m": 30.0,
+  "unchanged_values": "All non-jitter transition errors and remaining arrays were reused from the compatible training cache."
+}
