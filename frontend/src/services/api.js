@@ -1,14 +1,19 @@
-
 /** PathSnap backend API client. */
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:8000";
 
 async function request(endpoint, options = {}) {
-  const response = await fetch(
-    `${API_URL}${endpoint}`,
-    options
-  );
+  let response;
+  try {
+    response = await fetch(`${API_URL}${endpoint}`, options);
+  } catch {
+    throw new Error(
+      `Unable to reach PathSnap backend at ${API_URL}. Ensure FastAPI is running.`
+    );
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

@@ -36,3 +36,4 @@ evaluator_test/
 CONTRIBUTORS.md
 .package-lock.json
 .env.example
+frontend/pnpm-lock.yaml

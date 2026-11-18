@@ -1,59 +1,165 @@
-
 import React from "react";
 import { getTripMapUrl } from "../services/api";
+import { ExternalLinkIcon, MapIcon, RefreshIcon } from "./Icons";
 
-export function RouteMap({ tripId, result }) {
-  if (!tripId) {
-    return (
-      <p>Select a trip to view its GPS trajectory.</p>
-    );
-  }
-
+export function RouteMap({ tripId, result, loading }) {
   const predictedMap =
-    result?.trip_id === tripId ? result.map_html : null;
+    result?.trip_id === tripId && result?.map_html ? result.map_html : null;
 
   return (
-    <div>
-      <p style={{ color: "#64748b" }}>
-        {predictedMap
-          ? "Reconstructed route"
-          : "GPS trajectory"} for Trip {tripId}
-      </p>
+    <div className="card" style={{ overflow: "hidden" }}>
+      <div className="card-header">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h2 className="card-title">
+            <MapIcon size={17} />
+            Interactive Geospatial View
+          </h2>
+          {tripId && (
+            <span
+              className={`badge ${
+                predictedMap ? "badge-success" : "badge-info"
+              }`}
+            >
+              {predictedMap
+                ? `Reconstructed Route · Trip ${tripId}`
+                : `Raw GPS & Road Graph · Trip ${tripId}`}
+            </span>
+          )}
+        </div>
 
-      <iframe
-        key={tripId}
-        src={predictedMap ? undefined : getTripMapUrl(tripId)}
-        srcDoc={predictedMap || undefined}
-        title={`Route map for ${tripId}`}
-        style={{
-          width: "100%",
-          height: "500px",
-          border: "1px solid #cbd5e1",
-          borderRadius: "10px",
-        }}
-      />
+        {tripId && (
+          <a
+            href={getTripMapUrl(tripId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-ghost"
+            title="Open Folium map in a new tab"
+          >
+            Open Map <ExternalLinkIcon />
+          </a>
+        )}
+      </div>
 
-      <p style={{ fontSize: "14px" }}>
-        <span style={{ color: "blue" }}>
-          &#9679; Raw GPS trajectory
+      <div className="map-frame-wrap">
+        {!tripId ? (
+          <div
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 32,
+              textAlign: "center",
+              color: "var(--text-muted)",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border-subtle)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--accent)",
+              }}
+            >
+              <MapIcon size={22} />
+            </div>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+              }}
+            >
+              No Trip Selected
+            </div>
+            <div style={{ fontSize: 13, maxWidth: 380 }}>
+              Select an evaluation trip from the left panel to inspect its raw
+              GPS trajectory and run live HistGradientBoosting + HMM route
+              reconstruction.
+            </div>
+          </div>
+        ) : (
+          <>
+            {loading && (
+              <div className="map-overlay">
+                <RefreshIcon size={26} className="spin" />
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  Reconstructing Route for Trip {tripId}...
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                  Extracting 20 features (K=6) → HistGradientBoosting → Viterbi
+                  HMM + Recovery
+                </div>
+              </div>
+            )}
+
+            <iframe
+              key={`${tripId}-${predictedMap ? "pred" : "raw"}`}
+              src={predictedMap ? undefined : getTripMapUrl(tripId)}
+              srcDoc={predictedMap || undefined}
+              title={`Route map for ${tripId}`}
+              className="map-iframe"
+            />
+          </>
+        )}
+      </div>
+
+      <div className="map-legend">
+        <div className="legend-items">
+          <span className="legend-item">
+            <span
+              className="legend-swatch"
+              style={{ background: "#2563eb" }}
+            />
+            Raw GPS Trajectory
+          </span>
+          <span className="legend-item">
+            <span
+              className="legend-swatch"
+              style={{ background: "#16a34a" }}
+            />
+            Start Node
+          </span>
+          <span className="legend-item">
+            <span
+              className="legend-swatch"
+              style={{ background: "#dc2626" }}
+            />
+            End Node
+          </span>
+          <span className="legend-item">
+            <span
+              className="legend-line"
+              style={{ background: "#64748b" }}
+            />
+            Road Network
+          </span>
+          <span className="legend-item">
+            <span
+              className="legend-line"
+              style={{ background: "#dc2626" }}
+            />
+            Reconstructed Route
+          </span>
+        </div>
+
+        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+          Folium Interactive Layer Control
         </span>
-        &nbsp;&nbsp;
-        <span style={{ color: "green" }}>
-          &#9679; Start
-        </span>
-        &nbsp;&nbsp;
-        <span style={{ color: "red" }}>
-          &#9679; End
-        </span>
-        &nbsp;&nbsp;
-        <span style={{ color: "gray" }}>
-          &#9679; Road Network
-        </span>
-        &nbsp;&nbsp;
-        <span style={{ color: "#dc2626" }}>
-          &#9473; Predicted Route
-        </span>
-      </p>
+      </div>
     </div>
   );
 }
