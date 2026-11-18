@@ -5,7 +5,9 @@ Member 3 - Route Reconstruction
 
 import numpy as np
 import pandas as pd
-
+from route_reconstruction.distance_transition import (
+    distance_transition_score,
+)
 
 EPSILON = 1e-12
 
@@ -57,7 +59,53 @@ def calculate_transition_probabilities(
         (weights <= 0) | (weights > 1)
     ).any():
         raise ValueError("Invalid transition weights")
+    transition_mode = kwargs.get(
+        "transition_mode", "connectivity"
+    )
 
+    gps_track = kwargs.get("gps_track")
+    beta = float(kwargs.get("beta", 30.0))
+
+    if transition_mode not in (
+        "connectivity", "distance"
+    ):
+        raise ValueError("Invalid transition mode")
+
+    if transition_mode == "distance":
+
+        if road_network is None or gps_track is None:
+            raise ValueError(
+                "Road graph and GPS track are required"
+            )
+
+        if candidates["trip_id"].nunique() != 1:
+            raise ValueError(
+                "Process one trip at a time in distance mode"
+            )
+
+        ids = candidates["candidate_arc_id"].to_numpy(dtype=int)
+        obs = candidates["obs_id"].to_numpy(dtype=int)
+
+        if ids.min() < 0 or ids.max() >= len(road_network.arcs):
+            raise ValueError("Invalid candidate arc IDs")
+
+        if obs.min() < 0 or obs.max() >= len(gps_track):
+            raise ValueError("Invalid GPS observation IDs")
+
+        if not np.array_equal(
+            road_network.arcs[ids],
+            candidates[["from_node_id", "to_node_id"]].to_numpy()
+        ):
+            raise ValueError("Road endpoints do not match")
+
+        if "timestamp" in candidates.columns:
+            if not np.allclose(
+                gps_track[obs, 2],
+                candidates["timestamp"].to_numpy(),
+                rtol=0,
+                atol=1e-6,
+            ):
+                raise ValueError("GPS timestamps do not match")
     transitions = {}
 
     df = candidates.sort_values(
@@ -130,11 +178,36 @@ def calculate_transition_probabilities(
 
             matrix[same_arc] = same_arc_weight
 
-            # Normalise each transition row
+                     # Distance-based transition mode
 
-            matrix = matrix / matrix.sum(
-                axis=1, keepdims=True
-            )
+            if transition_mode == "distance":
+
+                gps1 = gps_track[int(current_obs), :2]
+                gps2 = gps_track[int(next_obs), :2]
+
+                for i, arc1 in enumerate(
+                    current_arcs.ravel()
+                ):
+                    for j, arc2 in enumerate(
+                        next_arcs.ravel()
+                    ):
+
+                        matrix[i, j] = distance_transition_score(
+                            graph=road_network,
+                            previous_arc=arc1,
+                            next_arc=arc2,
+                            previous_gps=gps1,
+                            next_gps=gps2,
+                            beta=beta,
+                        )
+
+            else:
+
+                # Preserve baseline normalisation
+
+                matrix = matrix / matrix.sum(
+                    axis=1, keepdims=True
+                )
 
             log_matrix = np.log(
                 np.clip(matrix, EPSILON, 1.0)
