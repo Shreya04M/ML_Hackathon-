@@ -110,7 +110,16 @@ All plots generated strictly from observed experimental data in [models/artifact
 
 ---
 
-## 6. Integration & Handoff API (Members 1, 3, and 4)
+## 6. Bayesian Hyperparameter Optimisation (`GP-EI`) & Representativeness Proof
+
+- **Zero Grid Search / Random Search**: `bayesian_tuning.py` implements 12-trial Gaussian Process (`ConstantKernel * Matern(nu=2.5) + WhiteKernel`) + Expected Improvement over `HistGradientBoosting`, verified across all **1,250,502 training rows** (`5-fold GroupKFold`) and all **114,960 student-test rows**:
+  - **Untuned Baseline**: CV Macro F1 `0.8608 (±0.0492)` | Student-Test Macro F1 `0.8928` | Log Loss `0.1672` | Sequence F1 `0.8771` | Inference `0.3112 s`
+  - **Bayesian-Tuned (Trial 6 GP-EI)**: CV Macro F1 **`0.8659 (±0.0475)`** | Student-Test Macro F1 **`0.8998`** | Log Loss **`0.1583`** | Sequence F1 **`0.8799`** | Inference **`0.2726 s`**
+- **Full-Dataset vs. Sample Verification**: Complete feature distributions and all 5 models evaluated on the `113,904`-row 80-trip stride sample match full `1,250,502`-row training evaluation within **`±0.0004` (`0.04%`)** Macro F1 (see [PHASE_1_REPORT.md](PHASE_1_REPORT.md) Sections 6, 8, 9, and 11).
+
+---
+
+## 7. Integration & Handoff API (Members 1, 3, and 4)
 
 ```python
 from models import load_final_model, predict_candidate_probabilities, FEATURE_COLUMNS
