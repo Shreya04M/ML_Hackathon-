@@ -33,3 +33,4 @@ node_modules/
 PathSnap_student_materials/
 Student folder/
 CONTRIBUTORS.md
+.package-lock.json
