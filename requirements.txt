@@ -12,3 +12,4 @@ joblib
 jupyter
 pytest
 httpx
+optuna
