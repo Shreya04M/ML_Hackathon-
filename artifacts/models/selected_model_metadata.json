@@ -1,0 +1,107 @@
+{
+  "selected_key": "hist_gradient_boosting",
+  "selected_name": "HistGradientBoosting",
+  "tuning_policy": "Bayesian Hyperparameter Optimisation Only (no GridSearch or RandomSearch)",
+  "ranking": [
+    {
+      "key": "hist_gradient_boosting",
+      "name": "HistGradientBoosting",
+      "composite_score": 0.87857
+    },
+    {
+      "key": "random_forest",
+      "name": "Random Forest",
+      "composite_score": 0.85083
+    },
+    {
+      "key": "logistic_regression",
+      "name": "Logistic Regression",
+      "composite_score": 0.85024
+    },
+    {
+      "key": "decision_tree",
+      "name": "Decision Tree",
+      "composite_score": 0.83062
+    },
+    {
+      "key": "knn",
+      "name": "KNN (Distance-Weighted)",
+      "composite_score": 0.77938
+    }
+  ],
+  "feature_columns": [
+    "ortho_dist_m",
+    "dist_to_start_m",
+    "dist_to_end_m",
+    "proj_fraction",
+    "is_endpoint_proj",
+    "segment_length_m",
+    "log_segment_length_m",
+    "dist_rank",
+    "dist_diff_from_min_m",
+    "dist_ratio_to_min",
+    "dist_zscore_in_obs",
+    "gps_speed_mps",
+    "dt_prev_s",
+    "heading_diff_deg",
+    "heading_cos",
+    "heading_sin",
+    "speed_weighted_heading_cos",
+    "prev_cand_connected",
+    "min_dist_from_prev_cand_m",
+    "node_in_out_degree_sum"
+  ],
+  "top_k": 6,
+  "config": {
+    "loss": "log_loss",
+    "learning_rate": 0.08,
+    "max_iter": 200,
+    "max_leaf_nodes": 63,
+    "max_depth": 12,
+    "min_samples_leaf": 30,
+    "l2_regularization": 1.0,
+    "class_weight": "balanced",
+    "early_stopping": true,
+    "validation_fraction": 0.1,
+    "n_iter_no_change": 15,
+    "scoring": "loss",
+    "random_state": 42
+  },
+  "cv_summary": {
+    "f1_macro_mean": 0.8608313877751599,
+    "f1_macro_std": 0.04922834190332712,
+    "log_loss_mean": 0.19975759313752411,
+    "top1_accuracy_mean": 0.7625657347059649
+  },
+  "student_test_summary": {
+    "n_candidates": 114960,
+    "positive_rate": 0.16671016005567155,
+    "accuracy": 0.9338378566457899,
+    "precision_macro": 0.8613454372132564,
+    "recall_macro": 0.9382413204168225,
+    "f1_macro": 0.8927816360795953,
+    "precision_pos": 0.7343959119114247,
+    "recall_pos": 0.9448473780328724,
+    "f1_pos": 0.8264342111268312,
+    "log_loss": 0.16715896283451803,
+    "confusion_matrix": {
+      "tn": 89246,
+      "fp": 6549,
+      "fn": 1057,
+      "tp": 18108
+    },
+    "train_time_s": 12.358333099997253,
+    "inference_time_s": 0.31119150000449736,
+    "top1_accuracy": 0.8790187891440501,
+    "candidate_miss_rate": 0.006837160751565707,
+    "top1_accuracy_given_hit": 0.8850701560775658,
+    "route_continuity": 0.921201044386423,
+    "sequence_f1_mean": 0.8770597599946228,
+    "per_trip_top1_mean": 0.8863062726027862,
+    "per_trip_top1_std": 0.04813518637799981,
+    "n_observations": 19160,
+    "n_trips": 10,
+    "inference_ms_per_trip": 31.119150000449736,
+    "inference_ms_per_1k_obs": 16.241727557646
+  }
+}

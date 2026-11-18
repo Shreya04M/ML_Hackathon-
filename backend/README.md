@@ -72,8 +72,5 @@ metrics are returned to the evaluator interface.
 
 ## Implementation Status
 
-The API foundation, trip listing and map generation have
-been implemented and tested.
-
-Trained model integration, HMM/Viterbi integration and
-end-to-end prediction evaluation are pending.
+- Live end-to-end pipeline integrated (`backend/services.py`): feature extraction (`preprocessing.spatial_pipeline`), Bayesian-tuned `HistGradientBoosting` emission scoring (`artifacts/models/selected_best_model_tuned.joblib`), distance-based HMM/Viterbi + constrained recovery (`route_reconstruction`), and server-side evaluation.
+- Verified across all 10 `evaluator_test` and 10 `student_test` trips with terminal inference logs on Laptop 1.

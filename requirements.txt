@@ -13,3 +13,5 @@ jupyter
 pytest
 httpx
 optuna
+pyarrow
+python-dotenv

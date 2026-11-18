@@ -32,6 +32,7 @@ data/processed/*
 node_modules/
 PathSnap_student_materials/
 Student folder/
+evaluator_test/
 CONTRIBUTORS.md
 .package-lock.json
 .env.example
