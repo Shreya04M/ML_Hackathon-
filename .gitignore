@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.ipynb_checkpoints/
+*.tmp
+*.temp
+*.log
+logs/
+.vscode/
+.idea/
+.pytest_cache/
+.mypy_cache/
+node_modules/
+frontend/.vite/
+# Do not blanket-ignore data/ or artifacts/; use Git LFS/approved storage for large files.
