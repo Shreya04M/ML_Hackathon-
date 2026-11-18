@@ -135,7 +135,10 @@ export function Home() {
         background: "#f8fafc",
       }}>
         <h2>Route Visualisation</h2>
-        <RouteMap tripId={selectedTrip} />
+        <RouteMap
+  tripId={selectedTrip}
+  result={result}
+/>
       </div>
 
       <Results result={result} />

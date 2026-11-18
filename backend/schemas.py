@@ -28,6 +28,7 @@ class RouteMetrics(BaseModel):
 
 
 class PredictionResponse(BaseModel):
+    map_html: str | None = None
     """Prediction results without ground-truth labels."""
 
     trip_id: str

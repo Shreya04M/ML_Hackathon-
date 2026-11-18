@@ -52,8 +52,11 @@ def predict_trip(trip_id: str) -> dict:
         "Model and HMM integration pending"
     )
 
-def generate_trip_map(trip_id: str) -> str:
-    """Generate a Folium map using raw GPS observations."""
+def generate_trip_map(
+    trip_id: str,
+    predicted_route: list[int] | None = None
+) -> str:
+    """Generate a map with GPS, road network and optional prediction."""
 
     if trip_id not in list_available_trips():
         raise ValueError("Invalid trip ID")
@@ -141,6 +144,37 @@ def generate_trip_map(trip_id: str) -> str:
         tooltip="End",
         icon=folium.Icon(color="red")
     ).add_to(route_map)
+
+    # Display the predicted reconstructed route
+    if predicted_route is not None:
+        predicted_segments = []
+
+        for arc_id in predicted_route:
+            if not 0 <= arc_id < len(road_segments):
+                raise ValueError(
+                    f"Invalid predicted arc ID: {arc_id}"
+                )
+
+            predicted_segments.append(
+                road_segments[arc_id]
+            )
+
+        if predicted_segments:
+            folium.GeoJson(
+                {
+                    "type": "MultiLineString",
+                    "coordinates": predicted_segments
+                },
+                name="Predicted Route",
+                style_function=lambda feature: {
+                    "color": "#dc2626",
+                    "weight": 5,
+                    "opacity": 0.9
+                },
+                tooltip="Predicted reconstructed route"
+            ).add_to(route_map)
+
+
 
     route_map.fit_bounds(coordinates)
     folium.LayerControl().add_to(route_map)

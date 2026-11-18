@@ -2,22 +2,28 @@
 import React from "react";
 import { getTripMapUrl } from "../services/api";
 
-export function RouteMap({ tripId }) {
+export function RouteMap({ tripId, result }) {
   if (!tripId) {
     return (
       <p>Select a trip to view its GPS trajectory.</p>
     );
   }
 
+  const predictedMap =
+    result?.trip_id === tripId ? result.map_html : null;
+
   return (
     <div>
       <p style={{ color: "#64748b" }}>
-        GPS trajectory for Trip {tripId}
+        {predictedMap
+          ? "Reconstructed route"
+          : "GPS trajectory"} for Trip {tripId}
       </p>
 
       <iframe
         key={tripId}
-        src={getTripMapUrl(tripId)}
+        src={predictedMap ? undefined : getTripMapUrl(tripId)}
+        srcDoc={predictedMap || undefined}
         title={`Route map for ${tripId}`}
         style={{
           width: "100%",
@@ -28,10 +34,25 @@ export function RouteMap({ tripId }) {
       />
 
       <p style={{ fontSize: "14px" }}>
-        🔵 Raw GPS trajectory
-        &nbsp;&nbsp; 🟢 Start
-        &nbsp;&nbsp; 🔴 End
-        &nbsp;&nbsp; ⚪ Road Network
+        <span style={{ color: "blue" }}>
+          &#9679; Raw GPS trajectory
+        </span>
+        &nbsp;&nbsp;
+        <span style={{ color: "green" }}>
+          &#9679; Start
+        </span>
+        &nbsp;&nbsp;
+        <span style={{ color: "red" }}>
+          &#9679; End
+        </span>
+        &nbsp;&nbsp;
+        <span style={{ color: "gray" }}>
+          &#9679; Road Network
+        </span>
+        &nbsp;&nbsp;
+        <span style={{ color: "#dc2626" }}>
+          &#9473; Predicted Route
+        </span>
       </p>
     </div>
   );
