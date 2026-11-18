@@ -1,0 +1,5 @@
+metric,runtime_seconds
+Previous HMM pipeline,69.04350139999588
+Improved HMM pipeline,153.69895439998072
+Legacy unconstrained recovery,2.968424499966204
+Improved constrained recovery,24.56834099999105

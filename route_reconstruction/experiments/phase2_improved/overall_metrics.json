@@ -1,0 +1,77 @@
+{
+  "total_trips": 10,
+  "total_observations": 19160,
+  "observation_metrics": {
+    "classifier_continuity": 0.921201044386423,
+    "classifier_connected_pairs": 17641,
+    "classifier_total_pairs": 19150,
+    "classifier_accuracy": 0.8790187891440501,
+    "hmm_continuity": 0.9785378590078329,
+    "hmm_connected_pairs": 18739,
+    "hmm_total_pairs": 19150,
+    "hmm_accuracy": 0.9079331941544885,
+    "total_observations": 19160,
+    "total_trips": 10,
+    "changed_predictions": 2211
+  },
+  "recovery": {
+    "inserted_arcs": 540,
+    "rejected_connections": 39,
+    "unreachable_transitions": 3,
+    "implausible_transitions": 36,
+    "invalid_timestamp_transitions": 0,
+    "route_sections": 49,
+    "extra_route_sections": 39,
+    "fragmented_trips": 8,
+    "fully_connected_trips": 2
+  },
+  "route_quality_macro_average": {
+    "sequence_similarity": 0.8189340237797081,
+    "sequence_lcs_f1": 0.8888851492795732,
+    "road_overlap_precision": 0.9089650062500583,
+    "road_overlap_recall": 0.9917879248165707,
+    "road_overlap_f1": 0.945528844967434
+  },
+  "previous_constrained_route_quality_macro_average": {
+    "sequence_similarity": 0.5589733025158441,
+    "sequence_lcs_f1": 0.6889519233826571,
+    "road_overlap_precision": 0.6018841324152,
+    "road_overlap_recall": 0.9919577591397527,
+    "road_overlap_f1": 0.7177206972089356
+  },
+  "previous_unconstrained_route_quality_macro_average": {
+    "sequence_similarity": 0.411531876215371,
+    "sequence_lcs_f1": 0.5674591101327779,
+    "road_overlap_precision": 0.5161876145806594,
+    "road_overlap_recall": 0.9976559035499003,
+    "road_overlap_f1": 0.6578211065087265
+  },
+  "runtime_seconds": {
+    "hmm_total": 152.16047349997098,
+    "hmm_pipeline_total": 153.69895439998072,
+    "legacy_unconstrained_recovery_total": 2.968424499966204,
+    "constrained_recovery_total": 24.56834099999105,
+    "overall": 196.98332860000664
+  },
+  "parameters": {
+    "beta": 30.0,
+    "transition_weight": 1.948614369534382,
+    "max_speed_mps": 60.0,
+    "gps_tolerance_m": 30.0,
+    "backward_tolerance_m": 30.0
+  },
+  "previous_constrained_recovery_counts": {
+    "inserted_arcs": 944,
+    "rejected_connections": 1235,
+    "route_sections": 1245,
+    "fully_connected_trips": 0,
+    "implausible_transitions": 1230,
+    "unreachable_transitions": 5
+  },
+  "previous_unconstrained_recovery_counts": {
+    "inserted_arcs": 4447,
+    "disconnected_pairs": 5,
+    "route_sections": 15,
+    "fully_connected_trips": 8
+  }
+}

@@ -5,6 +5,10 @@ Member 3 - Phase 2
 
 import numpy as np
 
+from route_reconstruction.constrained_recovery import (
+    recover_constrained_route,
+)
+
 
 def recover_continuous_route(
     predicted_arcs,
@@ -16,7 +20,8 @@ def recover_continuous_route(
     consecutive HMM predictions.
 
     Returns separate route sections if a directed
-    connection cannot be found.
+    connection cannot be found. Pass ``gps_track`` to apply time and
+    speed constraints; without timestamps, recovery remains connectivity-only.
     """
 
     predicted_arcs = [
@@ -33,6 +38,25 @@ def recover_continuous_route(
             raise ValueError(
                 f"Invalid arc ID: {arc_id}"
             )
+
+    gps_track = kwargs.get("gps_track")
+
+    if gps_track is not None:
+        result = recover_constrained_route(
+            predicted_arcs=predicted_arcs,
+            graph=graph,
+            gps_track=gps_track,
+            observation_ids=kwargs.get("observation_ids"),
+            max_speed_mps=kwargs.get("max_speed_mps", 60.0),
+            gps_tolerance_m=kwargs.get("gps_tolerance_m", 30.0),
+            backward_tolerance_m=kwargs.get(
+                "backward_tolerance_m", 30.0
+            ),
+        )
+        result["disconnected_pairs"] = result[
+            "rejected_connections"
+        ]
+        return result
 
     recovered_arcs = [predicted_arcs[0]]
 

@@ -100,15 +100,23 @@ def viterbi_decode(
                 f"Invalid transition shape at step {t}"
             )
 
-        if not np.isfinite(transition_matrix).all():
+        if np.isnan(transition_matrix).any() or np.isposinf(
+            transition_matrix
+        ).any():
             raise ValueError("Invalid transition values")
 
         # Combine previous path and transition scores
 
-        combined_scores = (
-            previous_scores[:, None]
-            + transition_weight * transition_matrix
-        )
+        if transition_weight == 0:
+            combined_scores = np.broadcast_to(
+                previous_scores[:, None],
+                expected_shape,
+            )
+        else:
+            combined_scores = (
+                previous_scores[:, None]
+                + transition_weight * transition_matrix
+            )
 
         # Find best previous candidate for each state
 
@@ -122,8 +130,15 @@ def viterbi_decode(
             axis=0,
         )
 
-        # Add current emission probability
+        # An all-unreachable transition starts a new independent section.
+        if not np.isfinite(best_scores).any():
+            scores.append(current_emissions.copy())
+            backpointers.append(
+                np.full(len(current_emissions), -1, dtype=int)
+            )
+            continue
 
+        # Add current emission probability
         current_scores = (
             best_scores + current_emissions
         )
@@ -132,32 +147,43 @@ def viterbi_decode(
 
         backpointers.append(best_previous)
 
-    # Identify best final candidate
-
-    best_last_candidate = int(
-        np.argmax(scores[-1])
+    segment_starts = [0]
+    segment_starts.extend(
+        t
+        for t in range(1, n_observations)
+        if (backpointers[t] == -1).all()
     )
+    segment_starts.append(n_observations)
 
-    best_score = float(
-        scores[-1][best_last_candidate]
-    )
+    best_path = [0] * n_observations
+    best_score = 0.0
+    decoded_segments = []
 
-    # Backtracking
+    for segment_index in range(len(segment_starts) - 1):
+        start = segment_starts[segment_index]
+        end = segment_starts[segment_index + 1]
 
-    best_path = [best_last_candidate]
+        best_state = int(np.argmax(scores[end - 1]))
+        best_score += float(scores[end - 1][best_state])
+        segment_path = [best_state]
 
-    for t in range(n_observations - 1, 0, -1):
+        for t in range(end - 1, start, -1):
+            previous_candidate = int(
+                backpointers[t][segment_path[-1]]
+            )
 
-        previous_candidate = int(
-            backpointers[t][best_path[-1]]
-        )
+            if previous_candidate < 0:
+                raise ValueError("Invalid Viterbi backpointer")
 
-        best_path.append(previous_candidate)
+            segment_path.append(previous_candidate)
 
-    best_path.reverse()
+        segment_path.reverse()
+        best_path[start:end] = segment_path
+        decoded_segments.append((start, end))
 
     return {
         "best_path": best_path,
         "log_score": best_score,
         "n_observations": n_observations,
+        "segments": decoded_segments,
     }

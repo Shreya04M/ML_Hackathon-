@@ -4,9 +4,8 @@ Member 3 - Route Reconstruction
 """
 
 import numpy as np
-import pandas as pd
 from route_reconstruction.distance_transition import (
-    distance_transition_score,
+    distance_transition_log_score,
 )
 
 EPSILON = 1e-12
@@ -65,6 +64,9 @@ def calculate_transition_probabilities(
 
     gps_track = kwargs.get("gps_track")
     beta = float(kwargs.get("beta", 30.0))
+    backward_tolerance_m = float(
+        kwargs.get("backward_tolerance_m", 30.0)
+    )
 
     if transition_mode not in (
         "connectivity", "distance"
@@ -72,11 +74,24 @@ def calculate_transition_probabilities(
         raise ValueError("Invalid transition mode")
 
     if transition_mode == "distance":
+        if beta <= 0 or not np.isfinite(beta):
+            raise ValueError("Beta must be positive")
+
+        if (
+            backward_tolerance_m < 0
+            or not np.isfinite(backward_tolerance_m)
+        ):
+            raise ValueError("Invalid backward tolerance")
 
         if road_network is None or gps_track is None:
             raise ValueError(
                 "Road graph and GPS track are required"
             )
+
+        gps_track = np.asarray(gps_track, dtype=float)
+
+        if gps_track.ndim != 2 or gps_track.shape[1] != 3:
+            raise ValueError("Invalid GPS track format")
 
         if candidates["trip_id"].nunique() != 1:
             raise ValueError(
@@ -178,28 +193,49 @@ def calculate_transition_probabilities(
 
             matrix[same_arc] = same_arc_weight
 
-                     # Distance-based transition mode
+            transition_log_matrix = None
+
+            # Distance-based transition mode
 
             if transition_mode == "distance":
 
-                gps1 = gps_track[int(current_obs), :2]
-                gps2 = gps_track[int(next_obs), :2]
+                transition_log_matrix = np.full(
+                    matrix.shape,
+                    float("-inf"),
+                    dtype=float,
+                )
 
-                for i, arc1 in enumerate(
-                    current_arcs.ravel()
+                gps1 = gps_track[int(current_obs)]
+                gps2 = gps_track[int(next_obs)]
+                time_gap = float(gps2[2] - gps1[2])
+
+                if (
+                    np.isfinite(time_gap)
+                    and time_gap > 0
+                    and np.isfinite(gps1[:2]).all()
+                    and np.isfinite(gps2[:2]).all()
                 ):
-                    for j, arc2 in enumerate(
-                        next_arcs.ravel()
+                    for i, arc1 in enumerate(
+                        current_arcs.ravel()
                     ):
+                        for j, arc2 in enumerate(
+                            next_arcs.ravel()
+                        ):
+                            transition_log_matrix[i, j] = (
+                                distance_transition_log_score(
+                                    graph=road_network,
+                                    previous_arc=arc1,
+                                    next_arc=arc2,
+                                    previous_gps=gps1[:2],
+                                    next_gps=gps2[:2],
+                                    beta=beta,
+                                    backward_tolerance_m=(
+                                        backward_tolerance_m
+                                    ),
+                                )
+                            )
 
-                        matrix[i, j] = distance_transition_score(
-                            graph=road_network,
-                            previous_arc=arc1,
-                            next_arc=arc2,
-                            previous_gps=gps1,
-                            next_gps=gps2,
-                            beta=beta,
-                        )
+                matrix = np.exp(transition_log_matrix)
 
             else:
 
@@ -209,9 +245,9 @@ def calculate_transition_probabilities(
                     axis=1, keepdims=True
                 )
 
-            log_matrix = np.log(
-                np.clip(matrix, EPSILON, 1.0)
-            )
+                transition_log_matrix = np.log(
+                    np.clip(matrix, EPSILON, 1.0)
+                )
 
             trip_transitions.append({
                 "from_obs_id": current_obs,
@@ -219,7 +255,7 @@ def calculate_transition_probabilities(
                 "from_candidates": current_arcs.ravel(),
                 "to_candidates": next_arcs.ravel(),
                 "transition_prob": matrix,
-                "transition_log_prob": log_matrix,
+                "transition_log_prob": transition_log_matrix,
             })
 
         transitions[trip_id] = trip_transitions
