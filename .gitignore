@@ -15,3 +15,8 @@ logs/
 node_modules/
 frontend/.vite/
 # Do not blanket-ignore data/ or artifacts/; use Git LFS/approved storage for large files.
+.env
+*.pyc
+
+data/raw/*
+data/processed/*
