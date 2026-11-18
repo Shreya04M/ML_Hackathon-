@@ -349,3 +349,4 @@ def generate_all_plots(
         saved.append(str(p8))
 
     return saved
+

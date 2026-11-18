@@ -567,3 +567,4 @@ def load_feature_dataset(
 
     X_df = df[feature_cols].replace([np.inf, -np.inf], np.nan).astype(np.float32)
     return X_df, y, meta_df
+

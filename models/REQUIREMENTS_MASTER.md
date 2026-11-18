@@ -184,3 +184,4 @@ Programmatic inspection of all 90 available trips (`80 train` + `10 student_test
 | **Section 3.3 Compulsory Plots (No Fabricated Curves)** | `plots.py` | `models/artifacts/plots/*.png` (CV F1, Test Top-1 & Macro F1, Log Loss, Confusion Matrices, Latency Pareto, HistGB/MLP real loss history, Feature Importances) |
 | **M3 / M4 Reproducible Handoff** | `train.py` & `__init__.py` | `selected_best_model.joblib`, `m3_handoff_student_test_probabilities.csv.gz`, `load_final_model()` |
 | **Section 3.2 Q1–Q9 Experimental Report** | `README.md` | Empirical answers tied to measured CSV/JSON outputs |
+
