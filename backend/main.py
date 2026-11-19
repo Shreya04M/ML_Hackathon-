@@ -1,7 +1,7 @@
 
 """FastAPI entry point for PathSnap."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
 
@@ -10,6 +10,14 @@ app = FastAPI(
     version="1.0.0",
     description="Map-matching and route reconstruction API"
 )
+
+
+@app.middleware("http")
+async def normalize_double_slashes(request: Request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("//"):
+        request.scope["path"] = "/" + path.lstrip("/")
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,
